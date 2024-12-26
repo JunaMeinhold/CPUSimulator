@@ -6,66 +6,66 @@
 
     public static class Jump
     {
-        public static void JMP(ParseBlock block)
+        public static void JMP(ref DecodeBlock block, Instruction instruction, int next)
         {
-            if (block.Param1.IsAddress)
+            if (instruction.IsAddress1)
             {
                 MicrocodeBuilder builder = new();
                 block.Add(builder
                    .SetMC(0b011)
                    .SetIORAM(RAMIOFlags.ZRegisterWriteToRamData | RAMIOFlags.RamDataWriteToROM_MCOP)
-                   .Build(block.Param1.AddressValue ?? 0));
+                   .Build(instruction.Operand1));
             }
         }
 
-        public static void JGE(ParseBlock block)
+        public static void JGE(ref DecodeBlock block, Instruction instruction, int next)
         {
-            JE(block);
-            JG(block);
+            JE(ref block, instruction, next);
+            JG(ref block, instruction, next);
         }
 
-        public static void JLE(ParseBlock block)
+        public static void JLE(ref DecodeBlock block, Instruction instruction, int next)
         {
-            JE(block);
-            JL(block);
+            JE(ref block, instruction, next);
+            JL(ref block, instruction, next);
         }
 
-        public static void JE(ParseBlock block)
+        public static void JE(ref DecodeBlock block, Instruction instruction, int next)
         {
-            if (block.Param1.IsAddress)
+            if (instruction.IsAddress1)
             {
                 MicrocodeBuilder builder = new();
                 block.Add(builder
                     .SetMC(0b100)
                     .SetALUFunction(ALUFunction.PassY)
                     .SetIORAM(RAMIOFlags.ZRegisterWriteToRamData | RAMIOFlags.RamDataWriteToROM_MCOP)
-                    .Build(block.Param1.AddressValue ?? 0));
+                    .Build(instruction.Operand1));
             }
         }
 
-        public static void JG(ParseBlock block)
+        public static void JG(ref DecodeBlock block, Instruction instruction, int next)
         {
-            if (block.Param1.IsAddress)
+            if (instruction.IsAddress1)
             {
                 MicrocodeBuilder builder = new();
                 block.Add(builder
                     .SetMC(0b101)
                     .SetALUFunction(ALUFunction.PassY)
                     .SetIORAM(RAMIOFlags.ZRegisterWriteToRamData | RAMIOFlags.RamDataWriteToROM_MCOP)
-                    .Build(block.Param1.AddressValue ?? 0));
+                    .Build(instruction.Operand1));
             }
         }
 
-        public static void JL(ParseBlock block)
+        public static void JL(ref DecodeBlock block, Instruction instruction, int next)
         {
-            if (block.Param1.IsAddress)
+            if (instruction.IsAddress1)
             {
                 MicrocodeBuilder builder = new();
                 block.Add(builder
                     .SetMC(0b110)
                     .SetALUFunction(ALUFunction.PassY)
                     .SetIORAM(RAMIOFlags.ZRegisterWriteToRamData | RAMIOFlags.RamDataWriteToROM_MCOP)
-                    .Build(block.Param1.AddressValue ?? 0));
+                    .Build(instruction.Operand1));
             }
         }
     }

@@ -1,34 +1,45 @@
 ﻿namespace CPUSimulator.Core.Memory
 {
     using CPUSimulator.Core.Buses;
+    using System.Buffers.Binary;
 
     public class Register : IBusInput, IBusOutput
     {
-        private readonly byte[] _value;
+        private readonly byte[] value;
+        private readonly int offset;
         private readonly int size;
 
         public string DebugName { get; }
 
-        public Register(int size, string name)
+        public Register(int size, string name, Register? parent = null, int offset = 0)
         {
             this.size = size;
+            this.offset = offset;
             DebugName = name;
-            _value = new byte[size];
+            if (parent != null)
+            {
+                value = parent.value;
+            }
+            else
+            {
+                value = new byte[size];
+            }
         }
 
         public void Reset()
         {
-            Array.Clear(_value, 0, size);
+            Array.Clear(value, 0, size);
         }
 
-        public byte[] Value
+        public Span<byte> Value
         {
-            get => _value;
+            get => value.AsSpan(offset, size);
         }
 
-        public void CopyFrom(byte[] other)
+        public void CopyFrom(Span<byte> other)
         {
-            Buffer.BlockCopy(other, 0, _value, 0, Math.Min(size, other.Length));
+            int toCopy = Math.Min(size, other.Length);
+            other.Slice(0, toCopy).CopyTo(Value);
         }
 
         public void SetValue(byte constant)
@@ -72,6 +83,33 @@
             Value[5] = (byte)(constant >> 40 & 0xFF);
             Value[6] = (byte)(constant >> 48 & 0xFF);
             Value[7] = (byte)(constant >> 56 & 0xFF);
+        }
+
+        public unsafe void SetValue(float constant)
+        {
+            uint value = *(uint*)&constant;
+            Value[0] = (byte)(value & 0xFF);
+            Value[1] = (byte)(value >> 8 & 0xFF);
+            Value[2] = (byte)(value >> 16 & 0xFF);
+            Value[3] = (byte)(value >> 24 & 0xFF);
+        }
+
+        public unsafe void SetValue(double constant)
+        {
+            ulong value = *(ulong*)&constant;
+            Value[0] = (byte)(value & 0xFF);
+            Value[1] = (byte)(value >> 8 & 0xFF);
+            Value[2] = (byte)(value >> 16 & 0xFF);
+            Value[3] = (byte)(value >> 24 & 0xFF);
+            Value[4] = (byte)(value >> 32 & 0xFF);
+            Value[5] = (byte)(value >> 40 & 0xFF);
+            Value[6] = (byte)(value >> 48 & 0xFF);
+            Value[7] = (byte)(value >> 56 & 0xFF);
+        }
+
+        public ulong GetValueUInt64()
+        {
+            return BinaryPrimitives.ReadUInt64LittleEndian(Value);
         }
     }
 }

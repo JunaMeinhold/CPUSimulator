@@ -6,76 +6,54 @@
 
     public static class MoveData
     {
-        public static void MOV(ParseBlock block)
+        public static void MOV(ref DecodeBlock block, Instruction instruction, int next)
         {
-            MicrocodeBuilder builder = new MicrocodeBuilder().SetNextAddress(block.NextAddress);
+            MicrocodeBuilder builder = new MicrocodeBuilder().SetNextAddress(next);
 
-            if (block.Param1.IsRegister && block.Param2.Type != null)
+            if (instruction.IsRegister1 && instruction.IsInterm2)
             {
-                builder.SetALUFunction(ALUFunction.PassY).SetZBus(block.Param1);
-
-                switch (block.Param2.Type)
-                {
-                    case NumberType.Byte:
-                        block.Add(builder.Build(block.Param2.Number8 ?? 0));
-                        break;
-
-                    case NumberType.Int16:
-                        block.Add(builder.Build(block.Param2.Number16 ?? 0));
-                        break;
-
-                    case NumberType.Int32:
-                        block.Add(builder.Build(block.Param2.Number32 ?? 0));
-                        break;
-
-                    case NumberType.Int64:
-                        block.Add(builder.Build(block.Param2.Number64 ?? 0));
-                        break;
-                }
+                block.Add(builder.SetALUFunction(ALUFunction.PassY).SetZBus(instruction.RegisterName1).Build(instruction.Operand2));
             }
 
-            if (block.Param1.IsRegister && block.Param2.IsRegister)
+            if (instruction.IsRegister1 && instruction.IsRegister2)
             {
-                block.Add(builder.SetALUFunction(ALUFunction.PassX).SetXBus(block.Param1).SetZBus(block.Param2).Build());
+                block.Add(builder.SetALUFunction(ALUFunction.PassX).SetXBus(instruction.RegisterName1).SetZBus(instruction.RegisterName2).Build());
             }
 
-            if (block.Param1.IsAddress && block.Param2.Type != null)
+            if (instruction.IsAddress1 && instruction.IsInterm2)
             {
-                builder.SetALUFunction(ALUFunction.PassY);
-                block.Add(builder.SetIORAM(RAMIOFlags.ZRegisterWriteToRamAddress).Build(block.Param1.AddressValue ?? 0));
-
-                builder.SetIORAM(RAMIOFlags.ZRegisterWriteToRamData).SetRAMMode(RAMMode.Write);
-
-                switch (block.Param2.Type)
-                {
-                    case NumberType.Byte:
-                        block.Add(builder.SetRAMBusWidth(RAMBusWidth.Bits8).Build(block.Param2.Number8 ?? 0));
-                        break;
-
-                    case NumberType.Int16:
-                        block.Add(builder.SetRAMBusWidth(RAMBusWidth.Bits16).Build(block.Param2.Number16 ?? 0));
-                        break;
-
-                    case NumberType.Int32:
-                        block.Add(builder.SetRAMBusWidth(RAMBusWidth.Bits32).Build(block.Param2.Number32 ?? 0));
-                        break;
-
-                    case NumberType.Int64:
-                        block.Add(builder.SetRAMBusWidth(RAMBusWidth.Bits64).Build(block.Param2.Number64 ?? 0));
-                        break;
-                }
+                block.Add(builder.SetMC(MemoryControlFlag.Step).SetNextAddress(0).SetALUFunction(ALUFunction.PassY).SetIORAM(RAMIOFlags.ZRegisterWriteToRamAddress).Build(instruction.Operand1));
+                block.Add(builder.SetMC(0).SetNextAddress(next).SetALUFunction(ALUFunction.PassY).SetIORAM(RAMIOFlags.ZRegisterWriteToRamData).SetRAMMode(RAMMode.Write).SetRAMBusWidth(instruction.OperandFlag2).Build(instruction.Operand2));
             }
 
-            if (block.Param1.IsRegister && block.Param2.IsAddress)
+            if (instruction.IsRegisterAddress1 && instruction.IsInterm2)
             {
-                block.Add(builder.SetALUFunction(ALUFunction.PassY).SetIORAM(RAMIOFlags.ZRegisterWriteToRamAddress).Build(block.Param1.AddressValue ?? 0));
-                block.Add(builder.SetALUFunction(ALUFunction.PassX).SetIORAM(RAMIOFlags.ZRegisterWriteToRamData).SetXBus(block.Param1).SetRAMMode(RAMMode.Write).SetRAMBusWidth(block.Param1).Build());
+                block.Add(builder.SetMC(MemoryControlFlag.Step).SetNextAddress(0).SetALUFunction(ALUFunction.PassX).SetXBus(instruction.RegisterName1).SetIORAM(RAMIOFlags.ZRegisterWriteToRamAddress).Build());
+                block.Add(builder.SetMC(0).SetNextAddress(next).SetALUFunction(ALUFunction.PassY).SetIORAM(RAMIOFlags.ZRegisterWriteToRamData).SetRAMMode(RAMMode.Write).SetRAMBusWidth(instruction.OperandFlag2).Build(instruction.Operand2));
             }
 
-            if (block.Param1.IsAddress && block.Param2.IsRegister)
+            if (instruction.IsRegister1 && instruction.IsAddress2)
             {
-                block.Add(builder.SetALUFunction(ALUFunction.PassY).SetIORAM(RAMIOFlags.ZRegisterWriteToRamAddress).Build(block.Param1.AddressValue ?? 0));
-                block.Add(builder.SetALUFunction(ALUFunction.NoOperation).SetZBus(block.Param2).SetIORAM(RAMIOFlags.RamDataWriteToZRegister).SetRAMMode(RAMMode.Read).SetRAMBusWidth(block.Param2).Build());
+                block.Add(builder.SetMC(MemoryControlFlag.Step).SetNextAddress(0).SetALUFunction(ALUFunction.PassY).SetIORAM(RAMIOFlags.ZRegisterWriteToRamAddress).Build(instruction.Operand2));
+                block.Add(builder.SetMC(0).SetNextAddress(next).SetALUFunction(ALUFunction.NoOperation).SetIORAM(RAMIOFlags.RamDataWriteToZRegister).SetZBus(instruction.RegisterName1).SetRAMMode(RAMMode.Read).SetRAMBusWidth(instruction.RegisterName1).Build());
+            }
+
+            if (instruction.IsAddress1 && instruction.IsRegister2)
+            {
+                block.Add(builder.SetMC(MemoryControlFlag.Step).SetNextAddress(0).SetALUFunction(ALUFunction.PassY).SetIORAM(RAMIOFlags.ZRegisterWriteToRamAddress).Build(instruction.Operand1));
+                block.Add(builder.SetMC(0).SetNextAddress(next).SetALUFunction(ALUFunction.PassX).SetXBus(instruction.RegisterName2).SetIORAM(RAMIOFlags.ZRegisterWriteToRamData).SetRAMMode(RAMMode.Write).SetRAMBusWidth(instruction.RegisterName2).Build());
+            }
+
+            if (instruction.IsRegisterAddress1 && instruction.IsRegister2)
+            {
+                block.Add(builder.SetMC(MemoryControlFlag.Step).SetNextAddress(0).SetALUFunction(ALUFunction.PassX).SetXBus(instruction.RegisterName1).SetIORAM(RAMIOFlags.ZRegisterWriteToRamAddress).Build());
+                block.Add(builder.SetMC(0).SetNextAddress(next).SetALUFunction(ALUFunction.PassX).SetXBus(instruction.RegisterName2).SetIORAM(RAMIOFlags.ZRegisterWriteToRamData).SetRAMMode(RAMMode.Write).SetRAMBusWidth(instruction.RegisterName2).Build());
+            }
+
+            if (instruction.IsRegister1 && instruction.IsRegisterAddress2)
+            {
+                block.Add(builder.SetMC(MemoryControlFlag.Step).SetNextAddress(0).SetALUFunction(ALUFunction.PassX).SetXBus(instruction.RegisterName1).SetIORAM(RAMIOFlags.ZRegisterWriteToRamAddress).Build());
+                block.Add(builder.SetMC(0).SetNextAddress(next).SetALUFunction(ALUFunction.NoOperation).SetIORAM(RAMIOFlags.RamDataWriteToZRegister).SetZBus(instruction.RegisterName1).SetRAMMode(RAMMode.Read).SetRAMBusWidth(instruction.RegisterName1).Build());
             }
         }
     }

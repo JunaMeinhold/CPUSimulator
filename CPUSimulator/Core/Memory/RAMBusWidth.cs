@@ -2,10 +2,9 @@
 {
     public enum RAMBusWidth
     {
-        None = 0,
-        Bits8 = 1,
-        Bits16 = 2,
-        Bits32 = 4,
-        Bits64 = 8,
+        Bits8 = 0,
+        Bits16 = 1,
+        Bits32 = 2,
+        Bits64 = 3,
     }
 }

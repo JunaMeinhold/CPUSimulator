@@ -1,11 +1,18 @@
 ﻿namespace CPUSimulator.Core
 {
+    using CPUSimulator.Core.Assembly;
     using CPUSimulator.Core.Decoding;
     using CPUSimulator.Core.Memory;
 
     public struct MicrocodeBuilder
     {
         private ulong _value;
+
+        public MicrocodeBuilder SetMC(MemoryControlFlag flag)
+        {
+            SetMC((int)flag);
+            return this;
+        }
 
         public MicrocodeBuilder SetMC(int mc)
         {
@@ -28,6 +35,13 @@
             return this;
         }
 
+        public MicrocodeBuilder SetALUMode(ALUMode mode)
+        {
+            _value &= ~(MicrocodeFieldPositions.ALU_MODE_MASK << MicrocodeFieldPositions.ALU_MODE_SHIFT);
+            _value |= ((ulong)mode & MicrocodeFieldPositions.ALU_MODE_MASK) << MicrocodeFieldPositions.ALU_MODE_SHIFT;
+            return this;
+        }
+
         public MicrocodeBuilder SetALUFunction(ALUFunction alufc)
         {
             _value &= ~(MicrocodeFieldPositions.ALU_FC_MASK << MicrocodeFieldPositions.ALU_FC_SHIFT);
@@ -35,9 +49,26 @@
             return this;
         }
 
-        public MicrocodeBuilder SetXBus(ParseObject parseObject)
+        public static byte RegisterToBinaryValue(RegisterAddress registerName)
         {
-            SetXBus(parseObject.RegisterToBinaryValue());
+            return (byte)registerName;
+        }
+
+        public static RAMBusWidth RegisterToByteWidth(RegisterAddress registerName)
+        {
+            return RegisterHelper.GetRegisterSize(registerName) switch
+            {
+                8 => RAMBusWidth.Bits64,
+                4 => RAMBusWidth.Bits32,
+                2 => RAMBusWidth.Bits16,
+                1 => RAMBusWidth.Bits8,
+                _ => 0,
+            };
+        }
+
+        public MicrocodeBuilder SetXBus(RegisterAddress registerName)
+        {
+            SetXBus(RegisterToBinaryValue(registerName));
             return this;
         }
 
@@ -48,9 +79,9 @@
             return this;
         }
 
-        public MicrocodeBuilder SetYBus(ParseObject parseObject)
+        public MicrocodeBuilder SetYBus(RegisterAddress registerName)
         {
-            SetYBus(parseObject.RegisterToBinaryValue());
+            SetYBus(RegisterToBinaryValue(registerName));
             return this;
         }
 
@@ -61,9 +92,9 @@
             return this;
         }
 
-        public MicrocodeBuilder SetZBus(ParseObject parseObject)
+        public MicrocodeBuilder SetZBus(RegisterAddress registerName)
         {
-            SetZBus(parseObject.RegisterToBinaryValue());
+            SetZBus(RegisterToBinaryValue(registerName));
             return this;
         }
 
@@ -106,9 +137,32 @@
             return this;
         }
 
-        public MicrocodeBuilder SetRAMBusWidth(ParseObject register)
+        public MicrocodeBuilder SetRAMBusWidth(RegisterAddress register)
         {
-            SetRAMBusWidth(register.RegisterToByteWidth());
+            SetRAMBusWidth(RegisterToByteWidth(register));
+            return this;
+        }
+
+        public MicrocodeBuilder SetRAMBusWidth(OperandFlag operandFlag)
+        {
+            switch (operandFlag)
+            {
+                case OperandFlag.Interm8:
+                    SetRAMBusWidth(RAMBusWidth.Bits8);
+                    break;
+
+                case OperandFlag.Interm16:
+                    SetRAMBusWidth(RAMBusWidth.Bits16);
+                    break;
+
+                case OperandFlag.Interm32:
+                    SetRAMBusWidth(RAMBusWidth.Bits32);
+                    break;
+
+                case OperandFlag.Interm64:
+                    SetRAMBusWidth(RAMBusWidth.Bits64);
+                    break;
+            }
             return this;
         }
 
@@ -146,6 +200,11 @@
         }
 
         public readonly Microcode Build(long constant)
+        {
+            return new Microcode(_value, constant);
+        }
+
+        public readonly Microcode Build(ulong constant)
         {
             return new Microcode(_value, constant);
         }

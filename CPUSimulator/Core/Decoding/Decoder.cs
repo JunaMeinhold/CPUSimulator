@@ -1,91 +1,130 @@
 ﻿namespace CPUSimulator.Core.Decoding
 {
     using CPUSimulator.Core;
+    using CPUSimulator.Core.Assembly;
     using CPUSimulator.Core.Decoding.Instructions;
 
-    public class Decoder
+    public static class Decoder
     {
-        public static DecodeResult Decode(string code)
+        public static DecodeResult Decode(AssemblyResult result)
         {
-            var microcodes = new List<Microcode>();
-            var blocks = new List<ParseBlock>();
-            var lines = code.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
-            byte i = 0;
-            foreach (string line in lines)
+            Microcode[] microcodes = new Microcode[result.Instructions.Length * 4];
+
+            for (int i = 0; i < result.Instructions.Length; i++)
             {
-                var block = new ParseBlock(line, i);
-                blocks.Add(block);
-                if (block.ParseObjects.Count == 0) continue;
-                switch (block.Param0.Instruction)
+                var instruction = result.Instructions[i];
+                var block = Decode(instruction, i + 1);
+                int baseIdx = i * 4;
+                for (int j = 0; j < 4; j++)
                 {
-                    case OpCode.MOV:
-                        MoveData.MOV(block);
-                        break;
-
-                    case OpCode.ADD:
-                        Add.ADD(block);
-                        break;
-
-                    case OpCode.SUB:
-                        Substract.SUB(block);
-                        break;
-
-                    case OpCode.MUL:
-                        Multiplication.MUL(block);
-                        break;
-
-                    case OpCode.DIV:
-                        Division.DIV(block);
-                        break;
-
-                    case OpCode.INC:
-                        Increment.INC(block);
-                        break;
-
-                    case OpCode.DEC:
-                        Decrement.DEC(block);
-                        break;
-
-                    case OpCode.CMP:
-                        Compare.CMP(block);
-                        break;
-
-                    case OpCode.JMP:
-                        Jump.JMP(block);
-                        break;
-
-                    case OpCode.JE:
-                        Jump.JE(block);
-                        break;
-
-                    case OpCode.JG:
-                        Jump.JG(block);
-                        break;
-
-                    case OpCode.JL:
-                        Jump.JL(block);
-                        break;
-
-                    case OpCode.JGE:
-                        Jump.JGE(block);
-                        break;
-
-                    case OpCode.JLE:
-                        Jump.JLE(block);
-                        break;
+                    microcodes[baseIdx + j] = block.Block[j];
                 }
-
-                while (block.Instructions.Count < 4)
-                {
-                    block.Add(new MicrocodeBuilder().SetNextAddress(block.NextAddress).Build());
-                }
-                i++;
             }
-            foreach (ParseBlock parseBlock in blocks)
+
+            return new DecodeResult(microcodes);
+        }
+
+        public static DecodeBlock Decode(Instruction instruction, int next)
+        {
+            DecodeBlock block = new();
+
+            switch (instruction.OpCode)
             {
-                microcodes.AddRange(parseBlock.Instructions);
+                case OpCode.MOV:
+                    MoveData.MOV(ref block, instruction, next);
+                    break;
+
+                case OpCode.ADD:
+                    MathOp(ref block, instruction, next, ALUFunction.Addition);
+                    break;
+
+                case OpCode.SUB:
+                    MathOp(ref block, instruction, next, ALUFunction.Substraction);
+                    break;
+
+                case OpCode.MUL:
+                    MathOp(ref block, instruction, next, ALUFunction.Multiplication);
+                    break;
+
+                case OpCode.DIV:
+                    MathOp(ref block, instruction, next, ALUFunction.Division);
+                    break;
+
+                case OpCode.INC:
+                    SingleOp(ref block, instruction, next, ALUFunction.Increment);
+                    break;
+
+                case OpCode.DEC:
+                    SingleOp(ref block, instruction, next, ALUFunction.Decrement);
+                    break;
+
+                case OpCode.CMP:
+                    Compare.CMP(ref block, instruction, next);
+                    break;
+
+                case OpCode.JMP:
+                    Jump.JMP(ref block, instruction, next);
+                    break;
+
+                case OpCode.JE:
+                    Jump.JE(ref block, instruction, next);
+                    break;
+
+                case OpCode.JG:
+                    Jump.JG(ref block, instruction, next);
+                    break;
+
+                case OpCode.JL:
+                    Jump.JL(ref block, instruction, next);
+                    break;
+
+                case OpCode.JGE:
+                    Jump.JGE(ref block, instruction, next);
+                    break;
+
+                case OpCode.JLE:
+                    Jump.JLE(ref block, instruction, next);
+                    break;
             }
-            return new DecodeResult(blocks, [.. microcodes]);
+
+            while (block.Index < 4)
+            {
+                block.Add(new MicrocodeBuilder().SetNextAddress(next).Build());
+            }
+
+            return block;
+        }
+
+        public static void SingleOp(ref DecodeBlock block, Instruction instruction, int next, ALUFunction function)
+        {
+            if (instruction.IsRegister1)
+            {
+                MicrocodeBuilder builder = new();
+                block.Add(builder
+                    .SetNextAddress(next)
+                    .SetALUFunction(function)
+                    .SetXBus(instruction.RegisterName1)
+                    .SetZBus(instruction.RegisterName1)
+                    .Build());
+            }
+        }
+
+        public static void MathOp(ref DecodeBlock block, Instruction instruction, int next, ALUFunction function)
+        {
+            MicrocodeBuilder builder = new MicrocodeBuilder().SetNextAddress(next).SetALUFunction(function);
+
+            if (instruction.IsRegister1 && instruction.IsInterm2)
+            {
+                block.Add(builder.SetXBus(instruction.RegisterName1).SetZBus(instruction.RegisterName1).Build(instruction.Operand2));
+            }
+            if (instruction.IsRegister1 && instruction.IsRegister2)
+            {
+                block.Add(builder
+                   .SetXBus(instruction.RegisterName1)
+                   .SetYBus(instruction.RegisterName2)
+                   .SetZBus(instruction.RegisterName1)
+                   .Build());
+            }
         }
     }
 }

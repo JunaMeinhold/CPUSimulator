@@ -1,6 +1,8 @@
 ﻿namespace CPUSimulator.Core
 {
     using CPUSimulator.Core.Memory;
+    using Newtonsoft.Json.Linq;
+    using System;
     using System.Buffers.Binary;
 
     public class ArithmeticLogicalUnit
@@ -14,25 +16,23 @@
         }
 
         public Register XRegister;
-
         public Register YRegister;
-
         public Register ZRegister;
-
         public Register FlagRegister;
-
         public ALUFunction Function;
+        public ALUMode Mode;
 
         public void Reset()
         {
             Function = ALUFunction.NoOperation;
+            Mode = ALUMode.Unsigned;
             XRegister.Reset();
             YRegister.Reset();
             ZRegister.Reset();
             FlagRegister.Reset();
         }
 
-        private long ZValue
+        private long ZValueSigned
         {
             set
             {
@@ -41,7 +41,16 @@
             }
         }
 
-        private long UpdateFlag(long b)
+        private ulong ZValueUnsigned
+        {
+            set
+            {
+                UpdateFlag(value);
+                ZRegister.SetValue(value);
+            }
+        }
+
+        private void UpdateFlag(long b)
         {
             ALUFlag flags = ALUFlag.NoneFlag;
             if (b == 0)
@@ -64,43 +73,73 @@
             }
 
             FlagRegister.SetValue((int)flags);
-            return b;
+        }
+
+        private void UpdateFlag(ulong b)
+        {
+            ALUFlag flags = ALUFlag.NoneFlag;
+            if (b == 0)
+            {
+                // is zero
+                flags |= ALUFlag.ZeroFlag;
+            }
+            else
+            {
+                if (b < 0)
+                {
+                    // < zero
+                    flags |= ALUFlag.SignFlag;
+                }
+                else
+                {
+                    // > zero
+                    flags |= ALUFlag.CarryFlag;
+                }
+            }
+
+            FlagRegister.SetValue((int)flags);
         }
 
         public void Execute()
         {
-            long x = BinaryPrimitives.ReadInt64LittleEndian(XRegister.Value);
-            long y = BinaryPrimitives.ReadInt64LittleEndian(YRegister.Value);
-            long z = BinaryPrimitives.ReadInt64LittleEndian(ZRegister.Value);
+            switch (Mode)
+            {
+                case ALUMode.Unsigned:
+                    ExecuteUnsigned();
+                    break;
+
+                case ALUMode.Signed:
+                    ExecuteSigned();
+                    break;
+
+                case ALUMode.Float:
+                    ExecuteFloat();
+                    break;
+            }
+        }
+
+        private unsafe void ExecuteUnsigned()
+        {
+            ulong x = BinaryPrimitives.ReadUInt64LittleEndian(XRegister.Value);
+            ulong y = BinaryPrimitives.ReadUInt64LittleEndian(YRegister.Value);
+            ulong z = BinaryPrimitives.ReadUInt64LittleEndian(ZRegister.Value);
             switch (Function)
             {
                 case ALUFunction.NoOperation:
-                    ZValue = z;
-                    break;
-
-                case ALUFunction.NegateZ:
-                    ZValue = -z;
+                    ZValueUnsigned = z;
                     break;
 
                 case ALUFunction.PassX:
-                    ZValue = x;
-                    break;
-
-                case ALUFunction.NegateX:
-                    ZValue = -x;
+                    ZValueUnsigned = x;
                     break;
 
                 case ALUFunction.PassY:
-                    ZValue = y;
-                    break;
-
-                case ALUFunction.NegateY:
-                    ZValue = -y;
+                    ZValueUnsigned = y;
                     break;
 
                 case ALUFunction.PassYFlipXY:
                     {
-                        ZValue = x;
+                        ZValueUnsigned = x;
                         XRegister.SetValue(y);
                         YRegister.SetValue(x);
                     }
@@ -108,47 +147,47 @@
 
                 case ALUFunction.PassXFlipXY:
                     {
-                        ZValue = x;
+                        ZValueUnsigned = x;
                         XRegister.SetValue(y);
                         YRegister.SetValue(x);
                     }
                     break;
 
                 case ALUFunction.PassXSetYX:
-                    ZValue = x;
+                    ZValueUnsigned = x;
                     XRegister.SetValue(y);
                     break;
 
                 case ALUFunction.Increment:
-                    ZValue = x + 1;
+                    ZValueUnsigned = x + 1;
                     break;
 
                 case ALUFunction.Decrement:
-                    ZValue = x - 1;
+                    ZValueUnsigned = x - 1;
                     break;
 
                 case ALUFunction.Addition:
-                    ZValue = x + y;
+                    ZValueUnsigned = x + y;
                     break;
 
                 case ALUFunction.Substraction:
-                    ZValue = x - y;
+                    ZValueUnsigned = x - y;
                     break;
 
                 case ALUFunction.Multiplication:
-                    ZValue = x * y;
+                    ZValueUnsigned = x * y;
                     break;
 
                 case ALUFunction.Division:
-                    ZValue = x / y;
+                    ZValueUnsigned = x / y;
                     break;
 
                 case ALUFunction.Modulus:
-                    ZValue = x % y;
+                    ZValueUnsigned = x % y;
                     break;
 
                 case ALUFunction.ShiftArithmeticallyLeft:
-                    ZValue = x << (int)y;
+                    ZValueUnsigned = x << (int)y;
                     break;
 
                 case ALUFunction.ShiftArithmeticallyRight:
@@ -158,122 +197,241 @@
                         {
                             t |= 0x8000;
                         }
-                        ZValue = t;
+                        ZValueUnsigned = t;
                     }
                     break;
 
                 case ALUFunction.Compare:
-                    ZValue = x - y;
+                    ulong b = x - y;
+                    ZRegister.SetValue(b);
+                    ALUFlag flags = ALUFlag.NoneFlag;
+
+                    if (b == 0)
+                    {
+                        flags |= ALUFlag.ZeroFlag; // Result is zero
+                    }
+
+                    if (x < y)
+                    {
+                        flags |= ALUFlag.CarryFlag; // Borrow occurred in unsigned subtraction
+                    }
+
+                    if (((long)x - (long)y) < 0)
+                    {
+                        flags |= ALUFlag.SignFlag; // Result is negative in signed subtraction
+                    }
+
+                    bool overflow = ((x ^ y) & (x ^ b) & 0x8000000000000000) != 0;
+                    if (overflow)
+                    {
+                        flags |= ALUFlag.OverflowFlag; // Signed overflow occurred
+                    }
+
+                    FlagRegister.SetValue((int)flags);
                     break;
 
                 case ALUFunction.And:
-                    ZValue = x & y;
+                    ZValueUnsigned = x & y;
                     break;
 
                 case ALUFunction.Nand:
-                    ZValue = x & y ^ long.MaxValue;
+                    ZValueUnsigned = x & y ^ ulong.MaxValue;
                     break;
 
                 case ALUFunction.Or:
-                    ZValue = x | y;
+                    ZValueUnsigned = x | y;
                     break;
 
                 case ALUFunction.Nor:
-                    ZValue = (x | y) ^ 0xFFFFFFFF;
+                    ZValueUnsigned = (x | y) ^ ulong.MaxValue;
                     break;
 
                 case ALUFunction.Xor:
-                    ZValue = x ^ y;
+                    ZValueUnsigned = x ^ y;
                     break;
 
                 case ALUFunction.Nxor:
-                    ZValue = x ^ y ^ 0xFFFFFFFF;
+                    ZValueUnsigned = x ^ y ^ ulong.MaxValue;
                     break;
 
                 case ALUFunction.ShiftLogicalLeft:
-                    ZValue = x << (int)y;
+                    ZValueUnsigned = x << (int)y;
                     break;
 
                 case ALUFunction.ShiftLogicalRight:
-                    ZValue = x >> (int)y;
+                    ZValueUnsigned = x >> (int)y;
                     break;
 
                 case ALUFunction.Comply:
-                    ZValue = x & y ^ x;
+                    ZValueUnsigned = x & y ^ x;
                     break;
 
-                case ALUFunction.Null:
-                    ZValue = 0;
+                case ALUFunction.Min:
+                    ZValueUnsigned = x > y ? y : x;
                     break;
 
                 case ALUFunction.Max:
-                    ZValue = 0xFFFFFFFF;
-                    break;
-
-                case ALUFunction.N1:
-                    ZValue = 0x1;
-                    break;
-
-                case ALUFunction.N2:
-                    ZValue = 0x2;
-                    break;
-
-                case ALUFunction.N3:
-                    ZValue = 0x3;
-                    break;
-
-                case ALUFunction.N4:
-                    ZValue = 0x4;
-                    break;
-
-                case ALUFunction.N5:
-                    ZValue = 0x5;
-                    break;
-
-                case ALUFunction.N6:
-                    ZValue = 0x6;
-                    break;
-
-                case ALUFunction.N7:
-                    ZValue = 0x7;
-                    break;
-
-                case ALUFunction.N8:
-                    ZValue = 0x8;
-                    break;
-
-                case ALUFunction.N9:
-                    ZValue = 0x9;
-                    break;
-
-                case ALUFunction.NA:
-                    ZValue = 0xA;
-                    break;
-
-                case ALUFunction.NB:
-                    ZValue = 0xB;
-                    break;
-
-                case ALUFunction.NC:
-                    ZValue = 0xC;
-                    break;
-
-                case ALUFunction.ND:
-                    ZValue = 0xD;
-                    break;
-
-                case ALUFunction.NE:
-                    ZValue = 0xE;
-                    break;
-
-                case ALUFunction.NF:
-                    ZValue = 0xF;
+                    ZValueUnsigned = x > y ? x : y;
                     break;
 
                 default:
-                    ZValue = z;
+                    ZValueUnsigned = z;
                     break;
             }
+        }
+
+        private void ExecuteSigned()
+        {
+            long x = BinaryPrimitives.ReadInt64LittleEndian(XRegister.Value);
+            long y = BinaryPrimitives.ReadInt64LittleEndian(YRegister.Value);
+            long z = BinaryPrimitives.ReadInt64LittleEndian(ZRegister.Value);
+            switch (Function)
+            {
+                case ALUFunction.NoOperation:
+                    ZValueSigned = z;
+                    break;
+
+                case ALUFunction.NegateZ:
+                    ZValueSigned = -z;
+                    break;
+
+                case ALUFunction.PassX:
+                    ZValueSigned = x;
+                    break;
+
+                case ALUFunction.NegateX:
+                    ZValueSigned = -x;
+                    break;
+
+                case ALUFunction.PassY:
+                    ZValueSigned = y;
+                    break;
+
+                case ALUFunction.NegateY:
+                    ZValueSigned = -y;
+                    break;
+
+                case ALUFunction.PassYFlipXY:
+                    {
+                        ZValueSigned = x;
+                        XRegister.SetValue(y);
+                        YRegister.SetValue(x);
+                    }
+                    break;
+
+                case ALUFunction.PassXFlipXY:
+                    {
+                        ZValueSigned = x;
+                        XRegister.SetValue(y);
+                        YRegister.SetValue(x);
+                    }
+                    break;
+
+                case ALUFunction.PassXSetYX:
+                    ZValueSigned = x;
+                    XRegister.SetValue(y);
+                    break;
+
+                case ALUFunction.Increment:
+                    ZValueSigned = x + 1;
+                    break;
+
+                case ALUFunction.Decrement:
+                    ZValueSigned = x - 1;
+                    break;
+
+                case ALUFunction.Addition:
+                    ZValueSigned = x + y;
+                    break;
+
+                case ALUFunction.Substraction:
+                    ZValueSigned = x - y;
+                    break;
+
+                case ALUFunction.Multiplication:
+                    ZValueSigned = x * y;
+                    break;
+
+                case ALUFunction.Division:
+                    ZValueSigned = x / y;
+                    break;
+
+                case ALUFunction.Modulus:
+                    ZValueSigned = x % y;
+                    break;
+
+                case ALUFunction.ShiftArithmeticallyLeft:
+                    ZValueSigned = x << (int)y;
+                    break;
+
+                case ALUFunction.ShiftArithmeticallyRight:
+                    {
+                        var t = x >> (int)y;
+                        if ((x & 0x8000) == 0x8000)
+                        {
+                            t |= 0x8000;
+                        }
+                        ZValueSigned = t;
+                    }
+                    break;
+
+                case ALUFunction.Compare:
+                    ZValueSigned = x - y;
+                    break;
+
+                case ALUFunction.And:
+                    ZValueSigned = x & y;
+                    break;
+
+                case ALUFunction.Nand:
+                    ZValueSigned = x & y ^ long.MaxValue;
+                    break;
+
+                case ALUFunction.Or:
+                    ZValueSigned = x | y;
+                    break;
+
+                case ALUFunction.Nor:
+                    ZValueSigned = (x | y) ^ 0xFFFFFFFF;
+                    break;
+
+                case ALUFunction.Xor:
+                    ZValueSigned = x ^ y;
+                    break;
+
+                case ALUFunction.Nxor:
+                    ZValueSigned = x ^ y ^ 0xFFFFFFFF;
+                    break;
+
+                case ALUFunction.ShiftLogicalLeft:
+                    ZValueSigned = x << (int)y;
+                    break;
+
+                case ALUFunction.ShiftLogicalRight:
+                    ZValueSigned = x >> (int)y;
+                    break;
+
+                case ALUFunction.Comply:
+                    ZValueSigned = x & y ^ x;
+                    break;
+
+                case ALUFunction.Min:
+                    ZValueSigned = x > y ? y : x;
+                    break;
+
+                case ALUFunction.Max:
+                    ZValueSigned = x > y ? x : y;
+                    break;
+
+                default:
+                    ZValueSigned = z;
+                    break;
+            }
+        }
+
+        private void ExecuteFloat()
+        {
+            throw new NotImplementedException();
         }
     }
 }

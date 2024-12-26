@@ -40,5 +40,20 @@
                 this.states[i++] = *states++;
             }
         }
+
+        public unsafe void UpdateState(byte index, int count)
+        {
+            if (index > 0)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    states[i] = i == index - 1;
+                }
+            }
+            else
+            {
+                Array.Clear(states, 0, count);
+            }
+        }
     }
 }

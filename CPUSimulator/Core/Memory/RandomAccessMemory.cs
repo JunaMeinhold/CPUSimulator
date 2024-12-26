@@ -1,5 +1,6 @@
 ﻿namespace CPUSimulator.Core.Memory
 {
+    using System;
     using System.Buffers.Binary;
 
     public class RandomAccessMemory
@@ -52,20 +53,32 @@
         private void WriteBus()
         {
             ulong address = BinaryPrimitives.ReadUInt64LittleEndian(MAR.Value);
-            int width = (int)BusWidth;
+            int width = Convert(BusWidth);
             for (uint i = 0; i < width; i++)
             {
-                Data[address + i] = MDR.Value[i];
+                Data[address + i] = MDR.Value[(int)i];
             }
+        }
+
+        private static int Convert(RAMBusWidth busWidth)
+        {
+            return busWidth switch
+            {
+                RAMBusWidth.Bits8 => 1,
+                RAMBusWidth.Bits16 => 2,
+                RAMBusWidth.Bits32 => 3,
+                RAMBusWidth.Bits64 => 4,
+                _ => 0
+            };
         }
 
         private void ReadBus()
         {
             ulong address = BinaryPrimitives.ReadUInt64LittleEndian(MAR.Value);
-            int width = (int)BusWidth;
+            int width = Convert(BusWidth);
             for (uint i = 0; i < width; i++)
             {
-                MDR.Value[i] = Data[address + i];
+                MDR.Value[(int)i] = Data[address + i];
             }
         }
 
@@ -75,6 +88,7 @@
             MDR.Reset();
             Mode = RAMMode.Wait;
             BusWidth = RAMBusWidth.Bits8;
+            Array.Clear(Data, 0, Data.Length);
         }
     }
 }

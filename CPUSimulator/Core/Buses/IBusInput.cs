@@ -2,8 +2,8 @@
 {
     public interface IBusInput
     {
-        public byte[] Value { get; }
+        public Span<byte> Value { get; }
 
-        void CopyFrom(byte[] other);
+        void CopyFrom(Span<byte> other);
     }
 }

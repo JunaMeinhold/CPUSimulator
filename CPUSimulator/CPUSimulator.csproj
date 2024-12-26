@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
@@ -16,5 +16,11 @@
 
 	<ItemGroup>
 	  <Folder Include="Core\Debugging\" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Update="CascadiaMono.ttf">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </None>
 	</ItemGroup>
 </Project>
