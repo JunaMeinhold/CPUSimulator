@@ -11,10 +11,15 @@
 
         public string DebugName { get; }
 
-        public Register(int size, string name, Register? parent = null, int offset = 0)
+        public RegisterAddress Address { get; }
+
+        public uint Size => (uint)size;
+
+        public Register(int size, string name, Register? parent = null, int offset = 0, RegisterAddress address = 0)
         {
             this.size = size;
             this.offset = offset;
+            Address = address;
             DebugName = name;
             if (parent != null)
             {
@@ -38,8 +43,9 @@
 
         public void CopyFrom(Span<byte> other)
         {
+            Array.Clear(value);
             int toCopy = Math.Min(size, other.Length);
-            other.Slice(0, toCopy).CopyTo(Value);
+            other[..toCopy].CopyTo(Value);
         }
 
         public void SetValue(byte constant)
@@ -109,7 +115,40 @@
 
         public ulong GetValueUInt64()
         {
-            return BinaryPrimitives.ReadUInt64LittleEndian(Value);
+            switch (size)
+            {
+                case 8:
+                    return BinaryPrimitives.ReadUInt64LittleEndian(Value);
+
+                case 4:
+                    return BinaryPrimitives.ReadUInt32LittleEndian(Value);
+
+                case 2:
+                    return BinaryPrimitives.ReadUInt16LittleEndian(Value);
+
+                case 1:
+                    return Value[0];
+            }
+            return 0;
+        }
+
+        public uint GetValueUInt32()
+        {
+            switch (size)
+            {
+                case 8:
+                    return (uint)BinaryPrimitives.ReadUInt64LittleEndian(Value);
+
+                case 4:
+                    return BinaryPrimitives.ReadUInt32LittleEndian(Value);
+
+                case 2:
+                    return BinaryPrimitives.ReadUInt16LittleEndian(Value);
+
+                case 1:
+                    return Value[0];
+            }
+            return 0;
         }
     }
 }

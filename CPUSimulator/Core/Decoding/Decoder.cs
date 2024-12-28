@@ -1,129 +1,73 @@
 ﻿namespace CPUSimulator.Core.Decoding
 {
     using CPUSimulator.Core;
-    using CPUSimulator.Core.Assembly;
     using CPUSimulator.Core.Decoding.Instructions;
 
     public static class Decoder
     {
-        public static DecodeResult Decode(AssemblyResult result)
+        public static IEnumerable<Microcode> Decode(Instruction instruction)
         {
-            Microcode[] microcodes = new Microcode[result.Instructions.Length * 4];
-
-            for (int i = 0; i < result.Instructions.Length; i++)
+            return instruction.OpCode switch
             {
-                var instruction = result.Instructions[i];
-                var block = Decode(instruction, i + 1);
-                int baseIdx = i * 4;
-                for (int j = 0; j < 4; j++)
-                {
-                    microcodes[baseIdx + j] = block.Block[j];
-                }
-            }
-
-            return new DecodeResult(microcodes);
+                OpCode.MOV => MoveData.MOV(instruction),
+                OpCode.ADD => MathOp(instruction, ALUFunction.Addition),
+                OpCode.SUB => MathOp(instruction, ALUFunction.Substraction),
+                OpCode.MUL => MathOp(instruction, ALUFunction.Multiplication),
+                OpCode.DIV => MathOp(instruction, ALUFunction.Division),
+                OpCode.INC => SingleOp(instruction, ALUFunction.Increment),
+                OpCode.DEC => SingleOp(instruction, ALUFunction.Decrement),
+                OpCode.CMP => Compare.CMP(instruction),
+                OpCode.JMP => Jump.JMP(instruction),
+                OpCode.JE => Jump.JE(instruction),
+                OpCode.JG => Jump.JG(instruction),
+                OpCode.JL => Jump.JL(instruction),
+                OpCode.JGE => Jump.JGE(instruction),
+                OpCode.JLE => Jump.JLE(instruction),
+                OpCode.JNE => Jump.JNE(instruction),
+                OpCode.JNZ => Jump.JNE(instruction),
+                OpCode.CALL => CallReturn.Call(instruction),
+                OpCode.RET => CallReturn.Return(),
+                OpCode.PUSH => Stack.Push(instruction),
+                OpCode.POP => Stack.Pop(instruction),
+                OpCode.HLT => Halt.HALT(),
+                OpCode.CLI => Interrupts.ClearInterruptFlag(),
+                OpCode.STI => Interrupts.SetInterruptFlag(),
+                _ => throw new NotImplementedException(),
+            };
         }
 
-        public static DecodeBlock Decode(Instruction instruction, int next)
-        {
-            DecodeBlock block = new();
-
-            switch (instruction.OpCode)
-            {
-                case OpCode.MOV:
-                    MoveData.MOV(ref block, instruction, next);
-                    break;
-
-                case OpCode.ADD:
-                    MathOp(ref block, instruction, next, ALUFunction.Addition);
-                    break;
-
-                case OpCode.SUB:
-                    MathOp(ref block, instruction, next, ALUFunction.Substraction);
-                    break;
-
-                case OpCode.MUL:
-                    MathOp(ref block, instruction, next, ALUFunction.Multiplication);
-                    break;
-
-                case OpCode.DIV:
-                    MathOp(ref block, instruction, next, ALUFunction.Division);
-                    break;
-
-                case OpCode.INC:
-                    SingleOp(ref block, instruction, next, ALUFunction.Increment);
-                    break;
-
-                case OpCode.DEC:
-                    SingleOp(ref block, instruction, next, ALUFunction.Decrement);
-                    break;
-
-                case OpCode.CMP:
-                    Compare.CMP(ref block, instruction, next);
-                    break;
-
-                case OpCode.JMP:
-                    Jump.JMP(ref block, instruction, next);
-                    break;
-
-                case OpCode.JE:
-                    Jump.JE(ref block, instruction, next);
-                    break;
-
-                case OpCode.JG:
-                    Jump.JG(ref block, instruction, next);
-                    break;
-
-                case OpCode.JL:
-                    Jump.JL(ref block, instruction, next);
-                    break;
-
-                case OpCode.JGE:
-                    Jump.JGE(ref block, instruction, next);
-                    break;
-
-                case OpCode.JLE:
-                    Jump.JLE(ref block, instruction, next);
-                    break;
-            }
-
-            while (block.Index < 4)
-            {
-                block.Add(new MicrocodeBuilder().SetNextAddress(next).Build());
-            }
-
-            return block;
-        }
-
-        public static void SingleOp(ref DecodeBlock block, Instruction instruction, int next, ALUFunction function)
+        public static IEnumerable<Microcode> SingleOp(Instruction instruction, ALUFunction function)
         {
             if (instruction.IsRegister1)
             {
                 MicrocodeBuilder builder = new();
-                block.Add(builder
-                    .SetNextAddress(next)
+                yield return builder
+                    .SetMC(ControlUnitFlag.Step)
+                    .SetCC(true)
                     .SetALUFunction(function)
                     .SetXBus(instruction.RegisterName1)
                     .SetZBus(instruction.RegisterName1)
-                    .Build());
+                    .Build();
             }
         }
 
-        public static void MathOp(ref DecodeBlock block, Instruction instruction, int next, ALUFunction function)
+        public static IEnumerable<Microcode> MathOp(Instruction instruction, ALUFunction function)
         {
-            MicrocodeBuilder builder = new MicrocodeBuilder().SetNextAddress(next).SetALUFunction(function);
+            MicrocodeBuilder builder = new MicrocodeBuilder().SetALUFunction(function);
 
-            if (instruction.IsRegister1 && instruction.IsInterm2)
+            if (instruction.IsRegister1 && instruction.IsImm2)
             {
-                block.Add(builder.SetXBus(instruction.RegisterName1).SetZBus(instruction.RegisterName1).Build(instruction.Operand2));
+                yield return builder.SetMC(ControlUnitFlag.Step).SetXBus(instruction.RegisterName1).SetZBus(instruction.RegisterName1).Build(instruction.Immediate);
             }
             if (instruction.IsRegister1 && instruction.IsRegister2)
             {
-                block.Add(builder
+                yield return builder
+                   .SetMC(ControlUnitFlag.Step)
+                   .SetCC(true)
                    .SetXBus(instruction.RegisterName1)
                    .SetYBus(instruction.RegisterName2)
                    .SetZBus(instruction.RegisterName1)
-                   .Build());
+                   .Build();
             }
         }
     }

@@ -1,94 +1,51 @@
 ﻿namespace CPUSimulator.Core.Memory
 {
+    using CPUSimulator.Core;
     using System;
-    using System.Buffers.Binary;
 
-    public class RandomAccessMemory
+    public unsafe class RandomAccessMemory : IMemory
     {
-        public RandomAccessMemory(int size)
+        public RandomAccessMemory(uint size)
         {
             Size = size;
-            Data = new byte[size];
-            MAR = new(8, "MAR");
-            MDR = new(8, "MDR");
+            Data = AllocT<byte>(size);
         }
 
-        /// <summary>
-        /// MemoryAddressRegister
-        /// </summary>
-        public Register MAR;
+        public uint Size { get; }
 
-        /// <summary>
-        /// MemoryDataRegister
-        /// </summary>
-        public Register MDR;
+        public byte* Data { get; }
 
-        public RAMMode Mode;
-        public RAMBusWidth BusWidth = RAMBusWidth.Bits8;
+        public bool CanRead { get; } = true;
 
-        public int Size { get; }
+        public bool CanWrite { get; } = true;
 
-        public byte[] Data;
+        public AddressRange Range { get; private set; }
 
-        public void Update()
+        public void Map(MemoryManagementUnit mmu, AddressRange range)
         {
-            switch (Mode)
-            {
-                case RAMMode.Wait:
-                    return;
-
-                case RAMMode.Write:
-                    WriteBus();
-                    break;
-
-                case RAMMode.Read:
-                    ReadBus();
-                    break;
-
-                default:
-                    return;
-            }
+            Range = range;
+            mmu.Map(range, MMUExecute);
         }
 
-        private void WriteBus()
+        private unsafe void MMUExecute(ulong address, Span<byte> span, MMUAction action)
         {
-            ulong address = BinaryPrimitives.ReadUInt64LittleEndian(MAR.Value);
-            int width = Convert(BusWidth);
-            for (uint i = 0; i < width; i++)
+            fixed (byte* buffer = span)
             {
-                Data[address + i] = MDR.Value[(int)i];
-            }
-        }
-
-        private static int Convert(RAMBusWidth busWidth)
-        {
-            return busWidth switch
-            {
-                RAMBusWidth.Bits8 => 1,
-                RAMBusWidth.Bits16 => 2,
-                RAMBusWidth.Bits32 => 3,
-                RAMBusWidth.Bits64 => 4,
-                _ => 0
-            };
-        }
-
-        private void ReadBus()
-        {
-            ulong address = BinaryPrimitives.ReadUInt64LittleEndian(MAR.Value);
-            int width = Convert(BusWidth);
-            for (uint i = 0; i < width; i++)
-            {
-                MDR.Value[(int)i] = Data[address + i];
+                if (action == MMUAction.Read)
+                {
+                    ulong toCopy = Math.Min((ulong)span.Length, Size - address);
+                    Memcpy(Data + address, buffer, toCopy);
+                }
+                else
+                {
+                    Buffer.MemoryCopy(buffer, Data + address, Size - address, (ulong)span.Length);
+                }
             }
         }
 
         public void Reset()
         {
-            MAR.Reset();
-            MDR.Reset();
-            Mode = RAMMode.Wait;
-            BusWidth = RAMBusWidth.Bits8;
-            Array.Clear(Data, 0, Data.Length);
+            Memset(Data, 0, Size);
         }
     }
 }

@@ -10,17 +10,23 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Hexa.NET.KittyUI" Version="1.1.0" />
-		<PackageReference Include="Hexa.NET.ImGui.Widgets" Version="1.2.4" />
+	  <None Remove="CascadiaMono.ttf" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <EmbeddedResource Include="CascadiaMono.ttf">
+	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+	  </EmbeddedResource>
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Hexa.NET.KittyUI" Version="1.1.1" />
+		<PackageReference Include="Hexa.NET.ImGui.Widgets" Version="1.2.5" />
+		<PackageReference Include="Hexa.NET.ImGui.Widgets.Extras" Version="1.0.3" />
+		<PackageReference Include="Microsoft.CodeAnalysis" Version="4.11.0" />
 	</ItemGroup>
 
 	<ItemGroup>
 	  <Folder Include="Core\Debugging\" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <None Update="CascadiaMono.ttf">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </None>
 	</ItemGroup>
 </Project>

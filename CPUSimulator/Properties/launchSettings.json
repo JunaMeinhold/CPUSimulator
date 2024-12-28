@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "CPUSimulator": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}

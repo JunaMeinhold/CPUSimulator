@@ -1,7 +1,6 @@
 ﻿namespace CPUSimulator.Core
 {
     using CPUSimulator.Core.Memory;
-    using Newtonsoft.Json.Linq;
     using System;
     using System.Buffers.Binary;
 
@@ -12,7 +11,7 @@
             XRegister = new(8, "XR");
             YRegister = new(8, "YR");
             ZRegister = new(8, "ZR");
-            FlagRegister = new(4, "FR");
+            FlagRegister = new(8, "FR");
         }
 
         public Register XRegister;
@@ -72,7 +71,7 @@
                 }
             }
 
-            FlagRegister.SetValue((int)flags);
+            FlagRegister.SetValue((ulong)flags);
         }
 
         private void UpdateFlag(ulong b)
@@ -97,7 +96,7 @@
                 }
             }
 
-            FlagRegister.SetValue((int)flags);
+            FlagRegister.SetValue((ulong)flags);
         }
 
         public void Execute()
@@ -227,7 +226,7 @@
                         flags |= ALUFlag.OverflowFlag; // Signed overflow occurred
                     }
 
-                    FlagRegister.SetValue((int)flags);
+                    FlagRegister.SetValue((ulong)flags);
                     break;
 
                 case ALUFunction.And:

@@ -1,171 +1,69 @@
 ﻿namespace CPUSimulator.Core.Memory
 {
-    using System.Buffers.Binary;
+    using CPUSimulator.Core;
+    using CPUSimulator.Core.Decoding;
+    using System;
 
-    public enum MemoryControlFlag
+    public unsafe class ReadonlyMemory : IMemory
     {
-        None = 0,
-        Step = 0b001,
-        StepBack = 0b010,
-        Jump = 0b011,
-        Equals = 0b100,
-        Greater = 0b101,
-        Less = 0b110,
-    }
-
-    public class MemoryManagementUnit
-    {
-        public MemoryManagementUnit(ReadonlyMemory readonlyMemory, RandomAccessMemory randomAccessMemory)
+        public ReadonlyMemory(uint size)
         {
-            MCOP = new(8, "MCOP");
-            CC = new(4, "CC");
-            NextIMCAR = new(8, "NextIMCAR");
-            MCAR = new(8, "MCAR");
-            this.readonlyMemory = readonlyMemory;
-            this.randomAccessMemory = randomAccessMemory;
+            Data = AllocT<byte>(size);
+            Memset(Data, 0, size);
+            Size = size;
         }
 
-        public Register MCOP;
-        public Register CC;
-        public Register NextIMCAR;
-        public Register MCAR;
-        private readonly ReadonlyMemory readonlyMemory;
-        private readonly RandomAccessMemory randomAccessMemory;
-    }
+        public byte* Data { get; }
 
-    public class ReadonlyMemory
-    {
-        public ReadonlyMemory()
+        public uint Size { get; }
+
+        public bool CanRead { get; } = true;
+
+        public bool CanWrite { get; } = false;
+
+        public AddressRange Range { get; private set; }
+
+        public void Load(Instruction[] instructions)
         {
-            MCOP = new(4, "MCOP");
-            CC = new(4, "CC");
-            NextIMCAR = new(4, "NextIMCAR");
-            MCAR = new(4, "MCAR");
-            Microcodes = null!;
-        }
-
-        public Register MCOP;
-
-        public Register CC;
-
-        public Register NextIMCAR;
-
-        public Register MCAR;
-
-        public Microcode[] Microcodes { get; set; }
-
-        public Microcode Current => Microcodes[BitConverter.ToInt32(MCAR.Value)];
-
-        public bool EndOfData => BitConverter.ToInt32(MCAR.Value) > Microcodes.Length - 1;
-
-        public int Size => Microcodes?.Length ?? 0;
-
-        public void Update()
-        {
-            MCAR.CopyFrom(NextIMCAR.Value);
-        }
-
-        public Register PC = new(8, "PC");
-
-        public void Update(MemoryControlFlag mc)
-        {
-            ulong value = BinaryPrimitives.ReadUInt64LittleEndian(PC.Value);
-            ulong mcop = BinaryPrimitives.ReadUInt64LittleEndian(MCOP.Value);
-            ALUFlag cc = (ALUFlag)BinaryPrimitives.ReadInt32LittleEndian(CC.Value);
-
-            ulong nextValue = value + 1;
-
-            switch (mc)
+            Span<byte> data = new(Data, (int)Size);
+            int total = 0;
+            foreach (Instruction instruction in instructions)
             {
-                case MemoryControlFlag.StepBack:
-                    nextValue = value - 1;
-                    break;
-
-                case MemoryControlFlag.Jump:
-                    nextValue = mcop;
-                    break;
-
-                case MemoryControlFlag.Equals:
-                    if ((cc & ALUFlag.ZeroFlag) != 0)
-                        nextValue = mcop;
-                    else
-                        nextValue = value + 1;
-                    break;
-
-                case MemoryControlFlag.Greater:
-                    if ((cc & ALUFlag.CarryFlag) != 0) // Greater
-                        nextValue = mcop;
-                    else
-                        nextValue = value + 1;
-                    break;
-
-                case MemoryControlFlag.Less:
-                    if ((cc & ALUFlag.SignFlag) != 0) // Less
-                        nextValue = mcop;
-                    else
-                        nextValue = value + 1;
-                    break;
+                int written = instruction.Write(data);
+                total += written;
+                data = data[written..];
             }
         }
 
-        public void Compute(MemoryControlFlag mc, int mcnext)
+        public void Map(MemoryManagementUnit mmu, AddressRange range)
         {
-            var mcar = BinaryPrimitives.ReadInt32LittleEndian(MCAR.Value);
-            var mcop = BinaryPrimitives.ReadInt32LittleEndian(MCOP.Value);
-            var cc = (ALUFlag)BinaryPrimitives.ReadInt32LittleEndian(CC.Value);
-            int nextValue;
-            switch (mc)
+            Range = range;
+            mmu.Map(range, MMUExecute);
+        }
+
+        private unsafe void MMUExecute(ulong address, Span<byte> span, MMUAction action)
+        {
+            if (action == MMUAction.Read)
             {
-                case MemoryControlFlag.None:
-                    nextValue = 4 * mcnext;
-                    break;
-
-                case MemoryControlFlag.Step:
-                    nextValue = mcar + 1 + 4 * mcnext;
-                    break;
-
-                case MemoryControlFlag.StepBack:
-                    nextValue = mcar + 1 - 4 * mcnext;
-                    break;
-
-                case MemoryControlFlag.Jump:
-                    nextValue = 4 * mcop;
-                    break;
-
-                case MemoryControlFlag.Equals:
-                    if ((cc & ALUFlag.ZeroFlag) != 0) // Eqauls
-                        nextValue = 4 * mcop;
-                    else
-                        nextValue = mcar + 1;
-                    break;
-
-                case MemoryControlFlag.Greater:
-                    if ((cc & ALUFlag.CarryFlag) != 0) // Greater
-                        nextValue = 4 * mcop;
-                    else
-                        nextValue = mcar + 1;
-                    break;
-
-                case MemoryControlFlag.Less:
-                    if ((cc & ALUFlag.SignFlag) != 0) // Less
-                        nextValue = 4 * mcop;
-                    else
-                        nextValue = mcar + 1;
-                    break;
-
-                default:
-                    return;
+                fixed (byte* buffer = span)
+                {
+                    Buffer.MemoryCopy(Data + address, buffer, span.Length, span.Length);
+                }
             }
+            else
+            {
+                throw new InvalidOperationException("Cannot write to ROM.");
+            }
+        }
 
-            NextIMCAR.SetValue(nextValue);
+        public Span<byte> AsSpan()
+        {
+            return new Span<byte>(Data, (int)Size);
         }
 
         public void Reset()
         {
-            MCOP.Reset();
-            CC.Reset();
-            NextIMCAR.Reset();
-            MCAR.Reset();
+            Memset(Data, 0, Size);
         }
     }
 }

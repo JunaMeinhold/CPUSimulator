@@ -3,16 +3,12 @@
     public static class MicrocodeFieldPositions
     {
         // 54 Bit
-        // MC  MCNext CC ALU-Mode ALU-FC X-Bus    Y-Bus    Z-Bus    IO-RAM Mode RAM-Bus-Width
-        // 000 000000 0  00       000000 00000000 00000000 00000000 000000 00   00
+        // CU-Flag  CC ALU-Mode ALU-FC X-Bus    Y-Bus    Z-Bus    IO-RAM Mode RAM-Bus-Width
+        // 00000000 0  00       000000 00000000 00000000 00000000 000000 00   00
 
         public const int MC_SHIFT = 48;
-        public const int MC_BITS = 3;
-        public const ulong MC_MASK = (1UL << MC_BITS) - 1; // 0b111 (3 bits)
-
-        public const int MCNEXT_SHIFT = 43;
-        public const int MCNEXT_BITS = 5;
-        public const ulong MCNEXT_MASK = (1UL << MCNEXT_BITS) - 1; // 0b11111 (5 bits)
+        public const int MC_BITS = 8;
+        public const ulong MC_MASK = (1UL << MC_BITS) - 1; // 0b11111111 (8 bits)
 
         public const int CC_SHIFT = 42;
         public const int CC_BITS = 1;

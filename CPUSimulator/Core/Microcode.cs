@@ -1,6 +1,5 @@
 ﻿namespace CPUSimulator.Core
 {
-    using CPUSimulator.Core.Memory;
     using Newtonsoft.Json.Linq;
 
     public unsafe struct Microcode
@@ -44,9 +43,9 @@
             Intermediate = value;
         }
 
-        public MemoryControlFlag MC
+        public ControlUnitFlag MC
         {
-            get => (MemoryControlFlag)GetValue(MicrocodeFieldPositions.MC_SHIFT, MicrocodeFieldPositions.MC_MASK);
+            get => (ControlUnitFlag)GetValue(MicrocodeFieldPositions.MC_SHIFT, MicrocodeFieldPositions.MC_MASK);
             set => SetValue((ulong)value, MicrocodeFieldPositions.MC_SHIFT, MicrocodeFieldPositions.MC_MASK);
         }
 

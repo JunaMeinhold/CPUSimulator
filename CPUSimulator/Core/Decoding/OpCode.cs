@@ -1,10 +1,11 @@
 ﻿namespace CPUSimulator.Core.Decoding
 {
-    public enum OpCode : ushort
+    public enum OpCode : byte
     {
         ADD,
         AND,
         CLI,
+        STI,
         CMP,
         CMPS,
         CMPSB,
@@ -26,6 +27,7 @@
         JLE,
         JMP,
         JNE,
+        JNZ,
         LOOP,
         LOOPNE,
         MOV,
@@ -36,5 +38,10 @@
         SUB,
         OR,
         XOR,
+        CALL,
+        RET,
+        PUSH,
+        POP,
+        HLT,
     }
 }

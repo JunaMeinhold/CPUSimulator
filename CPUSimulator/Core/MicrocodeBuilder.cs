@@ -1,6 +1,5 @@
 ﻿namespace CPUSimulator.Core
 {
-    using CPUSimulator.Core.Assembly;
     using CPUSimulator.Core.Decoding;
     using CPUSimulator.Core.Memory;
 
@@ -8,7 +7,7 @@
     {
         private ulong _value;
 
-        public MicrocodeBuilder SetMC(MemoryControlFlag flag)
+        public MicrocodeBuilder SetMC(ControlUnitFlag flag)
         {
             SetMC((int)flag);
             return this;
@@ -18,13 +17,6 @@
         {
             _value &= ~(MicrocodeFieldPositions.MC_MASK << MicrocodeFieldPositions.MC_SHIFT); // Clear current value
             _value |= ((ulong)mc & MicrocodeFieldPositions.MC_MASK) << MicrocodeFieldPositions.MC_SHIFT; // Set new value
-            return this;
-        }
-
-        public MicrocodeBuilder SetNextAddress(int mcnext)
-        {
-            _value &= ~(MicrocodeFieldPositions.MCNEXT_MASK << MicrocodeFieldPositions.MCNEXT_SHIFT);
-            _value |= ((ulong)mcnext & MicrocodeFieldPositions.MCNEXT_MASK) << MicrocodeFieldPositions.MCNEXT_SHIFT;
             return this;
         }
 
@@ -143,23 +135,23 @@
             return this;
         }
 
-        public MicrocodeBuilder SetRAMBusWidth(OperandFlag operandFlag)
+        public MicrocodeBuilder SetRAMBusWidth(OperandSource OperandSource)
         {
-            switch (operandFlag)
+            switch (OperandSource)
             {
-                case OperandFlag.Interm8:
+                case OperandSource.Imm8:
                     SetRAMBusWidth(RAMBusWidth.Bits8);
                     break;
 
-                case OperandFlag.Interm16:
+                case OperandSource.Imm16:
                     SetRAMBusWidth(RAMBusWidth.Bits16);
                     break;
 
-                case OperandFlag.Interm32:
+                case OperandSource.Imm32:
                     SetRAMBusWidth(RAMBusWidth.Bits32);
                     break;
 
-                case OperandFlag.Interm64:
+                case OperandSource.Imm64:
                     SetRAMBusWidth(RAMBusWidth.Bits64);
                     break;
             }

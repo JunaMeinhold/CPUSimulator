@@ -6,66 +6,90 @@
 
     public static class Jump
     {
-        public static void JMP(ref DecodeBlock block, Instruction instruction, int next)
+        public static IEnumerable<Microcode> JMP(Instruction instruction)
         {
-            if (instruction.IsAddress1)
+            if (instruction.IsImm1)
             {
                 MicrocodeBuilder builder = new();
-                block.Add(builder
-                   .SetMC(0b011)
+                yield return builder
+                      .SetMC(ControlUnitFlag.Jump)
+                      .SetALUFunction(ALUFunction.PassY)
+                      .SetIORAM(RAMIOFlags.ZRegisterWriteToRamData | RAMIOFlags.RamDataWriteToROM_MCOP)
+                      .Build(instruction.Immediate);
+            }
+            if (instruction.IsRegisterAddress1)
+            {
+                MicrocodeBuilder builder = new();
+                yield return (builder
+                   .SetMC(ControlUnitFlag.Jump)
+                   .SetALUFunction(ALUFunction.PassX)
+                   .SetXBus(instruction.RegisterName1)
                    .SetIORAM(RAMIOFlags.ZRegisterWriteToRamData | RAMIOFlags.RamDataWriteToROM_MCOP)
-                   .Build(instruction.Operand1));
+                   .Build());
             }
         }
 
-        public static void JGE(ref DecodeBlock block, Instruction instruction, int next)
+        public static IEnumerable<Microcode> JGE(Instruction instruction)
         {
-            JE(ref block, instruction, next);
-            JG(ref block, instruction, next);
+            yield return JE(instruction).First();
+            yield return JG(instruction).First();
         }
 
-        public static void JLE(ref DecodeBlock block, Instruction instruction, int next)
+        public static IEnumerable<Microcode> JLE(Instruction instruction)
         {
-            JE(ref block, instruction, next);
-            JL(ref block, instruction, next);
+            yield return JE(instruction).First();
+            yield return JL(instruction).First();
         }
 
-        public static void JE(ref DecodeBlock block, Instruction instruction, int next)
+        public static IEnumerable<Microcode> JE(Instruction instruction)
         {
-            if (instruction.IsAddress1)
+            if (instruction.IsImm1)
             {
                 MicrocodeBuilder builder = new();
-                block.Add(builder
-                    .SetMC(0b100)
+                yield return builder
+                    .SetMC(ControlUnitFlag.Equals)
                     .SetALUFunction(ALUFunction.PassY)
                     .SetIORAM(RAMIOFlags.ZRegisterWriteToRamData | RAMIOFlags.RamDataWriteToROM_MCOP)
-                    .Build(instruction.Operand1));
+                    .Build(instruction.Immediate);
             }
         }
 
-        public static void JG(ref DecodeBlock block, Instruction instruction, int next)
+        public static IEnumerable<Microcode> JG(Instruction instruction)
         {
-            if (instruction.IsAddress1)
+            if (instruction.IsImm1)
             {
                 MicrocodeBuilder builder = new();
-                block.Add(builder
-                    .SetMC(0b101)
+                yield return (builder
+                    .SetMC(ControlUnitFlag.Greater)
                     .SetALUFunction(ALUFunction.PassY)
                     .SetIORAM(RAMIOFlags.ZRegisterWriteToRamData | RAMIOFlags.RamDataWriteToROM_MCOP)
-                    .Build(instruction.Operand1));
+                    .Build(instruction.Immediate));
             }
         }
 
-        public static void JL(ref DecodeBlock block, Instruction instruction, int next)
+        public static IEnumerable<Microcode> JL(Instruction instruction)
         {
-            if (instruction.IsAddress1)
+            if (instruction.IsImm1)
             {
                 MicrocodeBuilder builder = new();
-                block.Add(builder
-                    .SetMC(0b110)
+                yield return (builder
+                    .SetMC(ControlUnitFlag.Less)
                     .SetALUFunction(ALUFunction.PassY)
                     .SetIORAM(RAMIOFlags.ZRegisterWriteToRamData | RAMIOFlags.RamDataWriteToROM_MCOP)
-                    .Build(instruction.Operand1));
+                    .Build(instruction.Immediate));
+            }
+        }
+
+        public static IEnumerable<Microcode> JNE(Instruction instruction)
+        {
+            if (instruction.IsImm1)
+            {
+                MicrocodeBuilder builder = new();
+                yield return (builder
+                    .SetMC(ControlUnitFlag.NotEquals)
+                    .SetALUFunction(ALUFunction.PassY)
+                    .SetIORAM(RAMIOFlags.ZRegisterWriteToRamData | RAMIOFlags.RamDataWriteToROM_MCOP)
+                    .Build(instruction.Immediate));
             }
         }
     }
