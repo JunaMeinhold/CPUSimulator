@@ -2,6 +2,7 @@
 {
     using CPUSimulator.Core;
     using CPUSimulator.Core.Assembly;
+    using CPUSimulator.Core.Assembly.Lexical;
     using CPUSimulator.Core.Memory;
     using Hexa.NET.ImGui;
     using Hexa.NET.ImGui.Widgets;
@@ -22,9 +23,10 @@
     public class MainWindow : ImWindow
     {
         private string? path;
+
         private string text = @"
 section .text
-;org 16384
+// org 16384
 
 start:
     mov rsp, 16384
@@ -101,6 +103,28 @@ func:
                         }
                     }
                 }
+
+                ImGui.SameLine();
+                byte* buf = stackalloc byte[256];
+                StrBuilder builder = new(buf, 256);
+                builder.Append("Latency: "u8);
+                if (processor.Latency < 1e-6)
+                {
+                    builder.Append(processor.Latency * 1_000_000_000);
+                    builder.Append(" ns"u8);
+                }
+                else if (processor.Latency < 1e-3)
+                {
+                    builder.Append(processor.Latency * 1_000_000);
+                    builder.Append(" µs"u8);
+                }
+                else
+                {
+                    builder.Append(processor.Latency * 1000);
+                    builder.Append(" ms"u8);
+                }
+                builder.End();
+                ImGui.Text(builder);
             }
             else
             {
@@ -895,14 +919,13 @@ func:
 
         private unsafe void Execute()
         {
+            var assemblyResult = assembler.Assemble(text);
+
             cancellationTokenSource = new();
             task = Task.Run(() =>
             {
                 try
                 {
-
-                    var assemblyResult = assembler.Assemble(text);
-
                     processor.Reset();
                     assemblyResult.Write(processor.ROM.AsSpan());
                     processor.Execute(cancellationTokenSource.Token);

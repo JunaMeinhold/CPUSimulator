@@ -3,6 +3,7 @@
     using CPUSimulator.Core.Buses;
     using CPUSimulator.Core.Decoding;
     using CPUSimulator.Core.Memory;
+    using System.Diagnostics;
     using static CPUSimulator.Core.MicrocodeFieldPositions;
 
     public class Processor : IDisposable
@@ -101,6 +102,8 @@
 
         public CPUMode Mode { get => executionMode; }
 
+        public double Latency { get; private set; }
+
         public void Step()
         {
             simulationHandle.Set();
@@ -155,6 +158,7 @@
             bool* ioram = stackalloc bool[6];
             while (true)
             {
+                long start = Stopwatch.GetTimestamp();
                 HandlePendingInterrupts();
                 var instruction = CU.Fetch();
 
@@ -252,6 +256,9 @@
                         break;
                     }
                 }
+
+                long end = Stopwatch.GetTimestamp();
+                Latency = (end - start) / (double)Stopwatch.Frequency;
             }
         }
 

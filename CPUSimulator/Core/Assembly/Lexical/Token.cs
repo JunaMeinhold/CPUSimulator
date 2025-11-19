@@ -1,5 +1,6 @@
 ﻿namespace CPUSimulator.Core.Assembly.Lexical
 {
+    using Hexa.NET.Utilities;
     using System;
     using System.Runtime.InteropServices;
     using System.Text;
@@ -9,20 +10,28 @@
     {
         [FieldOffset(0)]
         public byte* Text;
+
         [FieldOffset(8)]
         public uint Length;
+
         [FieldOffset(12)]
         public uint Line;
+
         [FieldOffset(16)]
         public uint Column;
+
         [FieldOffset(20)]
         public TokenType Type;
+
         [FieldOffset(21)]
         public NumberType NumberType;
+
         [FieldOffset(22)]
         public TokenFlags Flags;
+
         [FieldOffset(24)]
         public long Value;
+
         [FieldOffset(24)]
         public Number Number;
 
@@ -106,9 +115,18 @@
             return new(Text, (int)Length);
         }
 
+        public readonly StringSpan AsStringSpan()
+        {
+            return new(Text, (int)Length);
+        }
+
         public override readonly string ToString()
         {
             return Encoding.UTF8.GetString(Text, (int)Length);
         }
+
+        public static implicit operator Span<byte>(in Token token) => token.AsSpan();
+
+        public static implicit operator StringSpan(in Token token) => token.AsStringSpan();
     }
 }

@@ -10,18 +10,6 @@
         private uint idx;
         private unsafe byte* pCur;
 
-        public LexerException()
-        {
-        }
-
-        public LexerException(string? message) : base(message)
-        {
-        }
-
-        public LexerException(string? message, Exception? innerException) : base(message, innerException)
-        {
-        }
-
         public unsafe LexerException(string v, SourceText* source, uint idx, byte* pCur)
         {
             this.v = v;

@@ -4,6 +4,7 @@
     using System;
     using System.Runtime.CompilerServices;
     using System.Runtime.InteropServices;
+    using System.Xml.Linq;
 
     public unsafe class RadixTree<T> where T : unmanaged
     {
@@ -20,19 +21,16 @@
             {
                 public const int Length = 256;
                 TIndex index;
-
-                public Span<TIndex> AsSpan()
-                {
-                    return MemoryMarshal.CreateSpan(ref index, Length);
-                }
             }
 
             public readonly Span<byte> KeySpan => new(Key, KeyLength);
 
+            public Span<ushort> ChildrenSpan => MemoryMarshal.CreateSpan(ref Unsafe.As<ChildrenArray<ushort>, ushort>(ref Children), ChildrenArray<ushort>.Length);
+
             public readonly byte* KeyEnd => Key + KeyLength;
         }
 
-        private readonly Node* nodes;
+        private Node* nodes;
         private ushort nodesCapacity;
         private ushort nodeCount;
         private StringPool pool;
@@ -53,19 +51,29 @@
 
         private ushort CreateNode(ReadOnlySpan<byte> key, T value, ushort parent)
         {
+            if (key.Length == 0 && nodeCount != 0)
+            {
+                throw new InvalidOperationException("The root node must have an empty key and no parent.");
+            }
             var index = nodeCount++;
             if (nodes == null || nodeCount >= nodesCapacity)
             {
                 var newCapacity = Math.Max(nodesCapacity * 2, 4);
-                ReAllocT(nodes, newCapacity);
+                var newNodes = AllocT<Node>(newCapacity);
+                if (nodes != null)
+                {
+                    MemcpyT(nodes, newNodes, nodesCapacity);
+                    Free(nodes);
+                }
+                nodes = newNodes;
                 nodesCapacity = (ushort)newCapacity;
             }
-            ref Node node = ref nodes[index];
-            node.Key = AllocateKey(key);
-            node.KeyLength = (ushort)key.Length;
-            node.Parent = parent;
-            node.Value = value;
-            node.Children.AsSpan().Fill(InvalidIndex);
+            Node* node = &nodes[index];
+            node->Key = AllocateKey(key);
+            node->KeyLength = (ushort)key.Length;
+            node->Parent = parent;
+            node->Value = value;
+            node->ChildrenSpan.Fill(InvalidIndex);
             if (parent != InvalidIndex)
             {
                 nodes[parent].Children[key[0]] = index;
@@ -78,6 +86,7 @@
             Node* node = &nodes[index];
             ushort newKeyLength = (ushort)(split - node->Key);
             ushort newIndex = CreateNode(new(node->Key, newKeyLength), default, node->Parent);
+            node = &nodes[index];
             node->Parent = newIndex;
             node->KeyLength -= newKeyLength;
             node->Key = split;
@@ -96,12 +105,15 @@
 
             while (true)
             {
-                ref Node currentNode = ref nodes[currentIndex];
-                var commonPrefixLength = GetCommonPrefixLength(key, currentNode.KeySpan);
-
-                if (commonPrefixLength < currentNode.KeyLength)
+                var commonPrefixLength = GetCommonPrefixLength(key, nodes[currentIndex].KeySpan);
+                if (commonPrefixLength < nodes[currentIndex].KeyLength)
                 {
-                    ushort newIndex = SplitNode(currentIndex, currentNode.Key + commonPrefixLength);
+                    ushort newIndex = SplitNode(currentIndex, nodes[currentIndex].Key + commonPrefixLength);
+                    if (commonPrefixLength == key.Length)
+                    {
+                        nodes[newIndex].Value = value;
+                        return;
+                    }
                     CreateNode(key[commonPrefixLength..], value, newIndex);
                     return;
                 }
@@ -110,15 +122,16 @@
 
                 if (key.IsEmpty)
                 {
-                    currentNode.Value = value;
+                    nodes[currentIndex].Value = value;
                     return;
                 }
 
-                currentIndex = currentNode.Children[key[0]];
+                var parentIndex = currentIndex;
+                currentIndex = nodes[currentIndex].Children[key[0]];
 
                 if (currentIndex == InvalidIndex)
                 {
-                    CreateNode(key, value, currentIndex);
+                    CreateNode(key, value, parentIndex);
                     return;
                 }
             }
@@ -203,7 +216,7 @@
 
         public bool TryLookupLongestMatch(byte* key, byte* keyEnd, out T value, out nuint matchLength)
         {
-            ushort currentIndex = RootIndex;
+            ushort currentIndex = nodes[RootIndex].Children[*key];
             ushort lastIndex = InvalidIndex;
             byte* currentKey = key;
 
@@ -226,7 +239,7 @@
 
                 currentIndex = currentNode.Children[*currentKey];
             }
-            
+
             matchLength = (nuint)(currentKey - key);
             bool foundMatch = matchLength > 0;
             value = foundMatch ? nodes[lastIndex].Value : default;

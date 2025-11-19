@@ -25,18 +25,27 @@
 
         public LexerFlags Flags { readonly get => flags; set => flags = value; }
 
-        public bool TryAdvance()
+        private bool TryAdvance()
         {
             last = current;
             current = Lexer.Step(ref state, flags);
             return !current.IsEof;
         }
 
+        private void Advance()
+        {
+            if (!CanAdvance)
+            {
+                throw new AssemblyException($"Unexpected end of file at line {last.Line}, column {last.Column}.");
+            }
+            TryAdvance();
+        }
+
         public void ExpectDelimiter(char delimiter)
         {
             if (current.IsDelimiterOf(delimiter))
             {
-                TryAdvance();
+                Advance();
                 return;
             }
             throw new AssemblyException($"Expected delimiter '{delimiter}' at line {current.Line}, column {current.Column}.");
@@ -46,7 +55,7 @@
         {
             if (current.IsKeywordOf(keyword))
             {
-                TryAdvance();
+                Advance();
                 return;
             }
             throw new AssemblyException($"Expected keyword '{keyword}' at line {current.Line}, column {current.Column}.");
@@ -57,7 +66,7 @@
             if (current.IsIdentifier)
             {
                 Token identifier = current;
-                TryAdvance();
+                Advance();
                 return identifier;
             }
             throw new AssemblyException($"Expected identifier at line {current.Line}, column {current.Column}.");
@@ -68,7 +77,7 @@
             if (current.IsNumber)
             {
                 Token number = current;
-                TryAdvance();
+                Advance();
                 return number;
             }
             throw new AssemblyException($"Expected number at line {current.Line}, column {current.Column}.");
@@ -79,7 +88,7 @@
             if (current.IsLiteral)
             {
                 Token literal = current;
-                TryAdvance();
+                Advance();
                 return literal;
             }
             throw new AssemblyException($"Expected literal at line {current.Line}, column {current.Column}.");
@@ -89,9 +98,21 @@
         {
             if (current.IsKeywordOf(keyword))
             {
-                TryAdvance();
+                Advance();
                 return true;
             }
+            return false;
+        }
+
+        public bool TryKeyword(out Keyword keyword)
+        {
+            if (current.IsKeyword)
+            {
+                keyword = (Keyword)current.Value;
+                Advance();
+                return true;
+            }
+            keyword = default;
             return false;
         }
 
@@ -99,7 +120,7 @@
         {
             if (current.IsDelimiterOf(delimiter))
             {
-                TryAdvance();
+                Advance();
                 return true;
             }
             return false;
@@ -109,7 +130,7 @@
         {
             if (current.IsOperatorOf(op))
             {
-                TryAdvance();
+                Advance();
                 return true;
             }
             return false;
@@ -120,7 +141,7 @@
             if (current.IsIdentifier)
             {
                 identifier = current;
-                TryAdvance();
+                Advance();
                 return true;
             }
             identifier = default;
@@ -132,7 +153,7 @@
             if (current.IsNumber)
             {
                 number = current;
-                TryAdvance();
+                Advance();
                 return true;
             }
             number = default;
@@ -144,10 +165,28 @@
             if (current.IsLiteral)
             {
                 literal = current;
-                TryAdvance();
+                Advance();
                 return true;
             }
             literal = default;
+            return false;
+        }
+
+        public bool TryRegister(out RegisterAddress register)
+        {
+            if (current.IsKeyword)
+            {
+                var kw = (Keyword)current.Value;
+                if (!kw.IsRegister())
+                {
+                    register = default;
+                    return false;
+                }
+                register = kw.ToRegisterAddress();
+                Advance();
+                return true;
+            }
+            register = default;
             return false;
         }
     }
