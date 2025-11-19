@@ -3,25 +3,25 @@
     /// <summary>
     /// Multiple Outputs, one Input.
     /// </summary>
-    public class OutputBus : IBus
+    public class OutputBus<TOut, TIn> : IBus where TIn : IBusInput where TOut : IBusOutput
     {
         private readonly bool[] states;
 
-        public OutputBus(IBusInput input, params IBusOutput[] outputs)
+        public OutputBus(TIn input, TOut[] outputs)
         {
             Input = input;
             Outputs = outputs;
             states = new bool[outputs.Length];
         }
 
-        public readonly IBusOutput[] Outputs;
+        public readonly TOut[] Outputs;
 
-        public readonly IBusInput Input;
+        public readonly TIn Input;
 
         public void Push()
         {
             int i = 0;
-            foreach (IBusOutput output in Outputs)
+            foreach (var output in Outputs)
             {
                 if (states[i])
                 {

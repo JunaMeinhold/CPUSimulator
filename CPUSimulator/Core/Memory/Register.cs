@@ -1,154 +1,118 @@
 ﻿namespace CPUSimulator.Core.Memory
 {
     using CPUSimulator.Core.Buses;
-    using System.Buffers.Binary;
+    using System.Runtime.CompilerServices;
 
-    public class Register : IBusInput, IBusOutput
+    public unsafe struct Register : IBusInput, IBusOutput
     {
-        private readonly byte[] value;
-        private readonly int offset;
-        private readonly int size;
+        private byte* memory;
+        private uint size;
+        private readonly RegisterAddress address;
+        private readonly bool owns;
+        private readonly string debugName;
 
-        public string DebugName { get; }
-
-        public RegisterAddress Address { get; }
-
-        public uint Size => (uint)size;
-
-        public Register(int size, string name, Register? parent = null, int offset = 0, RegisterAddress address = 0)
+        public Register(byte* memory, uint size, RegisterAddress address, string debugName, bool owns)
         {
+            this.memory = memory;
             this.size = size;
-            this.offset = offset;
-            Address = address;
-            DebugName = name;
-            if (parent != null)
+            this.address = address;
+            this.owns = owns;
+            this.debugName = debugName;
+            Reset();
+        }
+
+        public static Register Create(uint size, RegisterAddress address, string debugName)
+        {
+            var mem = Alloc(size);
+            return new((byte*)mem, size, address, debugName, true);
+        }
+
+        public readonly Span<byte> Value => new(memory, (int)size);
+
+        public readonly uint Size => size;
+
+        public string DebugName => debugName;
+
+        public RegisterAddress Address => address;
+
+        public void Dispose()
+        {
+            if (memory != null)
             {
-                value = parent.value;
+                if (owns)
+                {
+                    Free(memory);
+                }
+
+                memory = null;
+                size = 0;
+            }
+        }
+
+        public readonly Register MakeSubRegister(uint start, uint length, RegisterAddress address, string debugName)
+        {
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(length, size - start);
+            return new(memory + start, length, address, debugName, false);
+        }
+
+        public readonly void Reset()
+        {
+            Memset(memory, 0, size);
+        }
+
+        public readonly void CopyFrom(Span<byte> other)
+        {
+            Reset();
+            var toCopy = Math.Min(size, other.Length);
+            fixed (byte* mem = other)
+            {
+                Memcpy(mem, memory, toCopy);
+            }
+        }
+
+        public readonly void SetValue<T>(T value) where T : unmanaged
+        {
+            uint sizeToCopy = (uint)sizeof(T);
+            if (sizeToCopy > size)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value));
+            }
+
+            sizeToCopy = Math.Min(sizeToCopy, size);
+            if (BitConverter.IsLittleEndian)
+            {
+                Memcpy(&value, memory, sizeToCopy);
             }
             else
             {
-                value = new byte[size];
+                var ptr = (byte*)&value;
+                for (uint i = 0; i < sizeToCopy; ++i)
+                {
+                    memory[i] = ptr[sizeToCopy - i - 1];
+                }
             }
         }
 
-        public void Reset()
+        public T GetValue<T>() where T : unmanaged
         {
-            Array.Clear(value, 0, size);
-        }
+            uint sizeT = (uint)sizeof(T);
+            sizeT = Math.Min(size, sizeT);
 
-        public Span<byte> Value
-        {
-            get => value.AsSpan(offset, size);
-        }
-
-        public void CopyFrom(Span<byte> other)
-        {
-            Array.Clear(value);
-            int toCopy = Math.Min(size, other.Length);
-            other[..toCopy].CopyTo(Value);
-        }
-
-        public void SetValue(byte constant)
-        {
-            Value[0] = constant;
-        }
-
-        public void SetValue(short constant)
-        {
-            Value[0] = (byte)(constant & 0xFF);
-            Value[1] = (byte)(constant >> 8 & 0xFF);
-        }
-
-        public void SetValue(int constant)
-        {
-            Value[0] = (byte)(constant & 0xFF);
-            Value[1] = (byte)(constant >> 8 & 0xFF);
-            Value[2] = (byte)(constant >> 16 & 0xFF);
-            Value[3] = (byte)(constant >> 24 & 0xFF);
-        }
-
-        public void SetValue(long constant)
-        {
-            Value[0] = (byte)(constant & 0xFF);
-            Value[1] = (byte)(constant >> 8 & 0xFF);
-            Value[2] = (byte)(constant >> 16 & 0xFF);
-            Value[3] = (byte)(constant >> 24 & 0xFF);
-            Value[4] = (byte)(constant >> 32 & 0xFF);
-            Value[5] = (byte)(constant >> 40 & 0xFF);
-            Value[6] = (byte)(constant >> 48 & 0xFF);
-            Value[7] = (byte)(constant >> 56 & 0xFF);
-        }
-
-        public void SetValue(ulong constant)
-        {
-            Value[0] = (byte)(constant & 0xFF);
-            Value[1] = (byte)(constant >> 8 & 0xFF);
-            Value[2] = (byte)(constant >> 16 & 0xFF);
-            Value[3] = (byte)(constant >> 24 & 0xFF);
-            Value[4] = (byte)(constant >> 32 & 0xFF);
-            Value[5] = (byte)(constant >> 40 & 0xFF);
-            Value[6] = (byte)(constant >> 48 & 0xFF);
-            Value[7] = (byte)(constant >> 56 & 0xFF);
-        }
-
-        public unsafe void SetValue(float constant)
-        {
-            uint value = *(uint*)&constant;
-            Value[0] = (byte)(value & 0xFF);
-            Value[1] = (byte)(value >> 8 & 0xFF);
-            Value[2] = (byte)(value >> 16 & 0xFF);
-            Value[3] = (byte)(value >> 24 & 0xFF);
-        }
-
-        public unsafe void SetValue(double constant)
-        {
-            ulong value = *(ulong*)&constant;
-            Value[0] = (byte)(value & 0xFF);
-            Value[1] = (byte)(value >> 8 & 0xFF);
-            Value[2] = (byte)(value >> 16 & 0xFF);
-            Value[3] = (byte)(value >> 24 & 0xFF);
-            Value[4] = (byte)(value >> 32 & 0xFF);
-            Value[5] = (byte)(value >> 40 & 0xFF);
-            Value[6] = (byte)(value >> 48 & 0xFF);
-            Value[7] = (byte)(value >> 56 & 0xFF);
-        }
-
-        public ulong GetValueUInt64()
-        {
-            switch (size)
+            Unsafe.SkipInit(out T value);
+            if (BitConverter.IsLittleEndian)
             {
-                case 8:
-                    return BinaryPrimitives.ReadUInt64LittleEndian(Value);
-
-                case 4:
-                    return BinaryPrimitives.ReadUInt32LittleEndian(Value);
-
-                case 2:
-                    return BinaryPrimitives.ReadUInt16LittleEndian(Value);
-
-                case 1:
-                    return Value[0];
+                Memcpy(memory, &value, sizeT);
             }
-            return 0;
-        }
-
-        public uint GetValueUInt32()
-        {
-            switch (size)
+            else
             {
-                case 8:
-                    return (uint)BinaryPrimitives.ReadUInt64LittleEndian(Value);
-
-                case 4:
-                    return BinaryPrimitives.ReadUInt32LittleEndian(Value);
-
-                case 2:
-                    return BinaryPrimitives.ReadUInt16LittleEndian(Value);
-
-                case 1:
-                    return Value[0];
+                var ptr = (byte*)&value;
+                for (uint i = 0; i < sizeT; ++i)
+                {
+                    ptr[i] = memory[i - sizeT - 1];
+                }
             }
-            return 0;
+
+            return value;
         }
     }
 }

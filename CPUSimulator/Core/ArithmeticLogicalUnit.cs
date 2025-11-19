@@ -4,14 +4,14 @@
     using System;
     using System.Buffers.Binary;
 
-    public class ArithmeticLogicalUnit
+    public class ArithmeticLogicalUnit : IDisposable
     {
         public ArithmeticLogicalUnit()
         {
-            XRegister = new(8, "XR");
-            YRegister = new(8, "YR");
-            ZRegister = new(8, "ZR");
-            FlagRegister = new(8, "FR");
+            XRegister = Register.Create(8, RegisterAddress.Disabled, "XR");
+            YRegister = Register.Create(8, RegisterAddress.Disabled, "YR");
+            ZRegister = Register.Create(8, RegisterAddress.Disabled, "ZR");
+            FlagRegister = Register.Create(8, RegisterAddress.Disabled, "FR");
         }
 
         public Register XRegister;
@@ -431,6 +431,15 @@
         private void ExecuteFloat()
         {
             throw new NotImplementedException();
+        }
+
+        public void Dispose()
+        {
+            XRegister.Dispose();
+            YRegister.Dispose();
+            ZRegister.Dispose();
+            FlagRegister.Dispose();
+            GC.SuppressFinalize(this);
         }
     }
 }

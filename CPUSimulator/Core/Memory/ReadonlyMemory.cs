@@ -4,18 +4,21 @@
     using CPUSimulator.Core.Decoding;
     using System;
 
-    public unsafe class ReadonlyMemory : IMemory
+    public unsafe class ReadonlyMemory : IMemory, IDisposable
     {
+        private byte* data;
+        private uint size;
+
         public ReadonlyMemory(uint size)
         {
-            Data = AllocT<byte>(size);
+            data = AllocT<byte>(size);
             Memset(Data, 0, size);
-            Size = size;
+            this.size = size;
         }
 
-        public byte* Data { get; }
+        public byte* Data => data;
 
-        public uint Size { get; }
+        public uint Size => size;
 
         public bool CanRead { get; } = true;
 
@@ -64,6 +67,17 @@
         public void Reset()
         {
             Memset(Data, 0, Size);
+        }
+
+        public void Dispose()
+        {
+            if (data != null)
+            {
+                Free(data);
+                data = null;
+                size = 0;
+            }
+            GC.SuppressFinalize(this);
         }
     }
 }

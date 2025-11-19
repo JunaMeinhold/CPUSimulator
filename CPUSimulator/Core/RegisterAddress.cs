@@ -1,5 +1,13 @@
 ﻿namespace CPUSimulator.Core
 {
+    /// <summary>
+    /// Specifies the set of supported CPU register addresses, including general-purpose and SIMD registers, for use in
+    /// low-level code generation or emulation scenarios.           
+    /// </summary>
+    /// <remarks>This enumeration includes 64-bit, 32-bit, 16-bit, and 8-bit sub-registers for x86/x64
+    /// architectures, as well as XMM SIMD registers. The values are typically used to identify registers when emitting
+    /// or interpreting machine instructions. The Disabled value indicates that no register is selected or
+    /// active.</remarks>
     public enum RegisterAddress : byte
     {
         Disabled = 0,  // Reserved for no active register

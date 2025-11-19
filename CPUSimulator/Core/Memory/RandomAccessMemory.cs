@@ -3,18 +3,21 @@
     using CPUSimulator.Core;
     using System;
 
-    public unsafe class RandomAccessMemory : IMemory
+    public unsafe class RandomAccessMemory : IMemory, IDisposable
     {
+        private byte* data;
+        private uint size;
+
         public RandomAccessMemory(uint size)
         {
-            Size = size;
-            Data = AllocT<byte>(size);
+            this.size = size;
+            data = AllocT<byte>(size);
         }
 
-        public uint Size { get; }
+        public byte* Data => data;
 
-        public byte* Data { get; }
-
+        public uint Size => size;
+        
         public bool CanRead { get; } = true;
 
         public bool CanWrite { get; } = true;
@@ -46,6 +49,17 @@
         public void Reset()
         {
             Memset(Data, 0, Size);
+        }
+
+        public void Dispose()
+        {
+            if (data != null)
+            {
+                Free(data);
+                data = null;
+                size = 0;
+            }
+            GC.SuppressFinalize(this);
         }
     }
 }

@@ -4,13 +4,7 @@
     using System;
     using System.Buffers.Binary;
 
-    public enum MMUAction
-    {
-        Read,
-        Write,
-    }
-
-    public class MemoryManagementUnit
+    public class MemoryManagementUnit : IDisposable
     {
         private readonly List<(AddressRange Range, Action<ulong, Span<byte>, MMUAction> Fetch)> mappings = [];
 
@@ -29,8 +23,8 @@
 
         public MemoryManagementUnit()
         {
-            MAR = new(8, "MAR");
-            MDR = new(8, "MDR");
+            MAR = Register.Create(8, RegisterAddress.Disabled, "MAR");
+            MDR = Register.Create(8, RegisterAddress.Disabled, "MDR");
         }
 
         public void Map(AddressRange range, Action<ulong, Span<byte>, MMUAction> fetch)
@@ -106,6 +100,13 @@
             MDR.Reset();
             Mode = RAMMode.Wait;
             BusWidth = RAMBusWidth.Bits8;
+        }
+
+        public void Dispose()
+        {
+            MAR.Dispose();
+            MDR.Dispose();
+            GC.SuppressFinalize(this);
         }
     }
 

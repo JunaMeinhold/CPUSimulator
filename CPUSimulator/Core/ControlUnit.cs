@@ -5,7 +5,7 @@ namespace CPUSimulator.Core
     using CPUSimulator.Core.Decoding;
     using System.Buffers.Binary;
 
-    public class ControlUnit
+    public class ControlUnit : IDisposable
     {
         private readonly MemoryManagementUnit mmu;
         private readonly ulong romStart;
@@ -19,20 +19,20 @@ namespace CPUSimulator.Core
 
         public ControlUnit(MemoryManagementUnit mmu, Register rsp, ulong romStart, ulong ivtBase)
         {
-            RIP = new(8, "RIP");
-            RFlags = new(8, "RFlags");
-            IOP = new(8, "IOP");
+            RIP = Register.Create(8, RegisterAddress.Disabled, "RIP");
+            RFlags = Register.Create(8, RegisterAddress.Disabled, "RFlags");
+            IOP = Register.Create(8, RegisterAddress.Disabled, "IOP");
             this.mmu = mmu;
             RSP = rsp;
             this.romStart = romStart;
             this.ivtBase = ivtBase;
         }
 
-        public bool InterruptEnabled => (((ALUFlag)RFlags.GetValueUInt64()) & ALUFlag.InterruptEnableFlag) != 0;
+        public bool InterruptEnabled => (((ALUFlag)RFlags.GetValue<ulong>()) & ALUFlag.InterruptEnableFlag) != 0;
 
         public unsafe Instruction Fetch()
         {
-            ulong current = RIP.GetValueUInt64();
+            ulong current = RIP.GetValue<ulong>();
             Span<byte> buffer = stackalloc byte[sizeof(Instruction)];
             mmu.Execute(current, buffer, MMUAction.Read);
             Instruction instruction = default;
@@ -43,8 +43,8 @@ namespace CPUSimulator.Core
 
         public unsafe bool Update(ControlUnitFlag controlFlag)
         {
-            ulong current = RIP.GetValueUInt64();
-            ulong iop = IOP.GetValueUInt64();
+            ulong current = RIP.GetValue<ulong>();
+            ulong iop = IOP.GetValue<ulong>();
             ALUFlag flags = (ALUFlag)BinaryPrimitives.ReadUInt64LittleEndian(RFlags.Value);
             ulong next;
             bool result = true;
@@ -100,7 +100,7 @@ namespace CPUSimulator.Core
                 case ControlUnitFlag.Call:
                     {
                         ulong returnAddress = current + nextOffset;
-                        ulong rsp = RSP.GetValueUInt64();
+                        ulong rsp = RSP.GetValue<ulong>();
                         rsp -= sizeof(ulong);
                         RSP.SetValue(rsp);
 
@@ -114,7 +114,7 @@ namespace CPUSimulator.Core
 
                 case ControlUnitFlag.Return:
                     {
-                        ulong rsp = RSP.GetValueUInt64();
+                        ulong rsp = RSP.GetValue<ulong>();
 
                         Span<byte> buffer = stackalloc byte[8];
                         mmu.Execute(rsp, buffer, MMUAction.Read);
@@ -129,7 +129,7 @@ namespace CPUSimulator.Core
 
                 case ControlUnitFlag.InterruptReturn:
                     {
-                        ulong rsp = RSP.GetValueUInt64();
+                        ulong rsp = RSP.GetValue<ulong>();
                         Span<byte> buffer = stackalloc byte[12];
                         mmu.Execute(rsp, buffer, MMUAction.Read);
 
@@ -164,7 +164,7 @@ namespace CPUSimulator.Core
         public unsafe void HandleInterrupt(int interruptNumber)
         {
             // Save the current state onto the stack
-            ulong rsp = RSP.GetValueUInt64();
+            ulong rsp = RSP.GetValue<ulong>();
             rsp -= RIP.Size + RFlags.Size;
 
             Span<byte> buffer = stackalloc byte[12];
@@ -208,6 +208,14 @@ namespace CPUSimulator.Core
             RIP.SetValue(romStart);
             IOP.Reset();
             RFlags.Reset();
+        }
+
+        public void Dispose()
+        {
+            RIP.Dispose();
+            IOP.Dispose();
+            RFlags.Dispose();
+            GC.SuppressFinalize(this);
         }
     }
 }

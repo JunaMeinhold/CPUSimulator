@@ -30,14 +30,13 @@ start:
     mov rsp, 16384
     mov rax, 10
     call func
-	mov rcx, 16384
-	mov [rcx+1], rbx
+	mov rcx, 20480
+	mov [rcx], rbx
     hlt
 
 func:
     mov rbx, 200
     ret
-
 ";
 
         private Task? task;
@@ -199,7 +198,7 @@ func:
                 draw.AddText(textPos, ImGui.GetColorU32(ImGuiCol.Text), label);
             }
             {
-                ulong value = alu.XRegister.GetValueUInt64();
+                ulong value = alu.XRegister.GetValue<ulong>();
                 builder.Reset();
                 builder.Append("X: 0x");
                 builder.AppendHex(value, false, true);
@@ -213,7 +212,7 @@ func:
                 draw.AddText(textPos, ImGui.GetColorU32(ImGuiCol.Text), builder);
             }
             {
-                ulong value = alu.YRegister.GetValueUInt64();
+                ulong value = alu.YRegister.GetValue<ulong>();
                 builder.Reset();
                 builder.Append("Y: 0x");
                 builder.AppendHex(value, false, true);
@@ -227,7 +226,7 @@ func:
                 draw.AddText(textPos, ImGui.GetColorU32(ImGuiCol.Text), builder);
             }
             {
-                ulong value = alu.ZRegister.GetValueUInt64();
+                ulong value = alu.ZRegister.GetValue<ulong>();
                 builder.Reset();
                 builder.Append("Z: 0x");
                 builder.AppendHex(value, false, true);
@@ -314,7 +313,7 @@ func:
                         }
                         builder.End();
                         ImGui.Text(builder);
-                        TooltipValue(builder, register.GetValueUInt64());
+                        TooltipValue(builder, register.GetValue<ulong>());
                     }
 
                     if (isOpen)
@@ -490,7 +489,7 @@ func:
             ImGuiTableFlags.ScrollY |
             ImGuiTableFlags.PadOuterX | ImGuiTableFlags.ContextMenuInBody | ImGuiTableFlags.NoSavedSettings;
 
-            ulong marValue = mmu.MAR.GetValueUInt64();
+            ulong marValue = mmu.MAR.GetValue<ulong>();
 
             bool highlight = memory.Range.InRange(marValue);
             marValue -= memory.Range.Start;
@@ -644,7 +643,7 @@ func:
             ImGui.End();
         }
 
-        public unsafe void DisplayStack(IMemory memory, Register rsp, int size)
+        public unsafe void DisplayStack(IMemory memory, in Register rsp, int size)
         {
             if (!ImGui.Begin("Stack"))
             {
@@ -654,7 +653,7 @@ func:
             byte* buf = stackalloc byte[2048];
             StrBuilder builder = new(buf, 2048);
 
-            ulong rspValue = rsp.GetValueUInt64();
+            ulong rspValue = rsp.GetValue<ulong>();
 
             ImGuiTableFlags flags =
             ImGuiTableFlags.Reorderable |

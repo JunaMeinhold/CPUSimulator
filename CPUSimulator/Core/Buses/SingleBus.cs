@@ -7,21 +7,21 @@
     /// <summary>
     /// One Input, One Output.
     /// </summary>
-    public class SingleBus : IBus
+    public class SingleBus<TIn, TOut> : IBus where TIn : IBusInput where TOut : IBusOutput
     {
         private bool state;
         private readonly ulong mask;
 
-        public SingleBus(IBusInput input, IBusOutput output, ulong mask = ulong.MaxValue)
+        public SingleBus(TIn input, TOut output, ulong mask = ulong.MaxValue)
         {
             Input = input;
             Output = output;
             this.mask = mask;
         }
 
-        public IBusInput Input { get; }
+        public TIn Input { get; }
 
-        public IBusOutput Output { get; }
+        public TOut Output { get; }
 
         public void Push()
         {
@@ -44,21 +44,21 @@
         }
     }
 
-    public class SingleFlagBus : IBus
+    public class SingleFlagBus<TIn, TOut> : IBus where TIn : IBusInput where TOut : IBusOutput
     {
         private bool state;
         private readonly ulong mask;
 
-        public SingleFlagBus(IBusInput input, IBusOutput output, ulong mask = ulong.MaxValue)
+        public SingleFlagBus(TIn input, TOut output, ulong mask = ulong.MaxValue)
         {
             Input = input;
             Output = output;
             this.mask = mask;
         }
 
-        public IBusInput Input { get; }
+        public TIn Input { get; }
 
-        public IBusOutput Output { get; }
+        public TOut Output { get; }
 
         public void Push()
         {

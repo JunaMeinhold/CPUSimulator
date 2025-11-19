@@ -5,7 +5,7 @@
     using CPUSimulator.Core.Memory;
     using static CPUSimulator.Core.MicrocodeFieldPositions;
 
-    public class Processor
+    public class Processor : IDisposable
     {
         public readonly ControlUnit CU;
         public readonly MemoryManagementUnit MMU = new();
@@ -13,14 +13,14 @@
         public readonly RandomAccessMemory RAM;
         public readonly ReadonlyMemory ROM;
         public readonly Register[] Registers;
-        public readonly InputBus XBus;
-        public readonly InputBus YBus;
-        public readonly OutputBus ZBus;
-        public readonly SingleBus YMDRBus;
-        public readonly InputBus ORAMBus;
-        public readonly OutputBus IRAMBus;
-        public readonly SingleBus FlagsCCBus;
-        public readonly SingleBus MDRMCOPBus;
+        public readonly InputBus<Register, Register> XBus;
+        public readonly InputBus<Register, Register> YBus;
+        public readonly OutputBus<Register, Register> ZBus;
+        public readonly SingleBus<Register, Register> YMDRBus;
+        public readonly InputBus<Register, Register> ORAMBus;
+        public readonly OutputBus<Register, Register> IRAMBus;
+        public readonly SingleBus<Register, Register> FlagsCCBus;
+        public readonly SingleBus<Register, Register> MDRMCOPBus;
         public readonly InterruptController InterruptController = new();
 
         private readonly ManualResetEventSlim simulationHandle = new(true);
@@ -29,7 +29,7 @@
 
         public Processor()
         {
-            const uint memory = 1048576 * 16;
+            const uint memory = 1024 * 1024 * 16;
             ALU = new();
             ROM = new(4096);
             RAM = new(memory);
@@ -51,8 +51,15 @@
                 int offset = RegisterHelper.GetRegisterOffset(registerAddress);
 
                 Register? parent = RegisterHelper.GetParentRegister(registerAddress) is { } parentAddress ? parentMap.GetValueOrDefault(parentAddress) : null;
-
-                var register = new Register(size, name, parent, offset, registerAddress);
+                Register register;
+                if (parent != null)
+                {
+                    register = parent.Value.MakeSubRegister((uint)offset, (uint)size, registerAddress, name);
+                }
+                else
+                {
+                    register = Register.Create((uint)size, registerAddress, name);
+                }
                 Registers[i - 1] = register;
 
                 if (parent == null)
@@ -63,14 +70,14 @@
 
             CU = new(MMU, Registers[(int)RegisterAddress.RSP - 1], romStart: 16384, 0);
 
-            XBus = new InputBus(ALU.XRegister, Registers);
-            ZBus = new OutputBus(ALU.ZRegister, Registers);
-            YBus = new InputBus(ALU.YRegister, Registers);
+            XBus = new(ALU.XRegister, Registers);
+            ZBus = new(ALU.ZRegister, Registers);
+            YBus = new(ALU.YRegister, Registers);
             YMDRBus = new(ALU.YRegister, MMU.MDR);
-            IRAMBus = new OutputBus(ALU.ZRegister, MMU.MAR, MMU.MDR);
-            ORAMBus = new InputBus(ALU.ZRegister, MMU.MAR, MMU.MDR);
-            FlagsCCBus = new SingleBus(ALU.FlagRegister, CU.RFlags);
-            MDRMCOPBus = new SingleBus(MMU.MDR, CU.IOP);
+            IRAMBus = new(ALU.ZRegister, [MMU.MAR, MMU.MDR]);
+            ORAMBus = new(ALU.ZRegister, [MMU.MAR, MMU.MDR]);
+            FlagsCCBus = new(ALU.FlagRegister, CU.RFlags);
+            MDRMCOPBus = new(MMU.MDR, CU.IOP);
         }
 
         public void Reset()
@@ -80,7 +87,7 @@
             CU.Reset();
             MMU.Reset();
             ALU.Reset();
-            foreach (Register reg in Registers)
+            foreach (var reg in Registers)
             {
                 reg.Reset();
             }
@@ -246,6 +253,22 @@
                     }
                 }
             }
+        }
+
+        public void Dispose()
+        {
+            CU.Dispose();
+            MMU.Dispose();
+            ALU.Dispose();
+            RAM.Dispose();
+            ROM.Dispose();
+            foreach (var register in Registers)
+            {
+                register.Dispose();
+            }
+            simulationHandle.Dispose();
+            interruptHandle.Dispose();
+            GC.SuppressFinalize(this);
         }
     }
 }
