@@ -8,10 +8,12 @@
     using Hexa.NET.ImGui.Widgets.Dialogs;
     using Hexa.NET.ImGui.Widgets.Extras.TextEditor;
     using Hexa.NET.KittyUI.ImGuiBackend;
+    using Hexa.NET.Logging;
     using Hexa.NET.Utilities.Text;
     using Newtonsoft.Json.Linq;
     using System;
     using System.Buffers.Binary;
+    using System.Diagnostics;
     using System.Globalization;
     using System.Net;
     using System.Numerics;
@@ -20,6 +22,23 @@
     public class MainWindow : ImWindow
     {
         private string? path;
+        private string text = @"
+section .text
+;org 16384
+
+start:
+    mov rsp, 16384
+    mov rax, 10
+    call func
+	mov rcx, 16384
+	mov [rcx+1], rbx
+    hlt
+
+func:
+    mov rbx, 200
+    ret
+
+";
 
         private Task? task;
         private CancellationTokenSource cancellationTokenSource = new();
@@ -30,7 +49,12 @@
 
         private readonly TextEditorTab textEditor = new("New File", new TextSource(string.Empty));
 
-        protected override string Name { get; } = "CPU Simulator";
+        public override string Name { get; } = "CPU Simulator";
+
+        public MainWindow()
+        {
+            IsEmbedded = true;
+        }
 
         public override unsafe void DrawContent()
         {
@@ -97,27 +121,29 @@
             if (ImGui.BeginTabBar("##TextEditor"))
             {
                 var avail = ImGui.GetContentRegionAvail();
-                ImGuiManager.PushFont("CascadiaMono");
-                textEditor.Font = ImGui.GetFont();
-                ImGuiManager.PopFont();
-                textEditor.Draw(avail);
+                //ImGuiManager.PushFont("CascadiaMono", 17);
+                //textEditor.Font = ImGui.GetFont();
+                //textEditor
+                //ImGuiManager.PopFont();
 
-                if (ImGuiP.Shortcut((int)(ImGuiKey.ModCtrl | ImGuiKey.A)))
+                ImGui.InputTextMultiline("##d", ref text, 1024, avail, ImGuiInputTextFlags.AllowTabInput);
+
+                if (ImGui.Shortcut((int)(ImGuiKey.ModCtrl | ImGuiKey.A)))
                 {
                     textEditor?.SelectAll();
                 }
 
-                if (ImGuiP.Shortcut((int)(ImGuiKey.ModCtrl | ImGuiKey.Z)))
+                if (ImGui.Shortcut((int)(ImGuiKey.ModCtrl | ImGuiKey.Z)))
                 {
                     textEditor?.Undo();
                 }
 
-                if (ImGuiP.Shortcut((int)(ImGuiKey.ModCtrl | ImGuiKey.Y)))
+                if (ImGui.Shortcut((int)(ImGuiKey.ModCtrl | ImGuiKey.Y)))
                 {
                     textEditor?.Redo();
                 }
 
-                if (ImGuiP.Shortcut((int)(ImGuiKey.ModCtrl | ImGuiKey.F)))
+                if (ImGui.Shortcut((int)(ImGuiKey.ModCtrl | ImGuiKey.F)))
                 {
                     textEditor?.ShowFind();
                 }
@@ -502,7 +528,7 @@
                 if (jumpToAddress.HasValue && jumpToAddress.Value.Id == label)
                 {
                     int item = (int)(jumpToAddress.Value.Address / byteWidth);
-                    ImGuiP.SetScrollY(item * lineHeight);
+                    ImGui.SetScrollY(item * lineHeight);
                     jumpToAddress = default;
                 }
 
@@ -561,7 +587,7 @@
                             int length = (int)(pEnd - pData);
                             int buffered = Math.Min(length, 8);
                             Memcpy(pData, buffer, buffered);
-                            bool bigEndian = ImGuiP.IsKeyDown(ImGuiKey.LeftCtrl);
+                            bool bigEndian = ImGui.IsKeyDown(ImGuiKey.LeftCtrl);
                             if (bigEndian)
                             {
                                 ImGui.Text("Big-Endian"u8);
@@ -873,11 +899,23 @@
             cancellationTokenSource = new();
             task = Task.Run(() =>
             {
-                var assemblyResult = assembler.Assemble(textEditor.Source.Text->ToString());
+                try
+                {
 
-                processor.Reset();
-                assemblyResult.Write(processor.ROM.AsSpan());
-                processor.Execute(cancellationTokenSource.Token);
+                    var assemblyResult = assembler.Assemble(text);
+
+                    processor.Reset();
+                    assemblyResult.Write(processor.ROM.AsSpan());
+                    processor.Execute(cancellationTokenSource.Token);
+                }
+                catch (Exception ex)
+                {
+                    LoggerFactory.General.Log(ex);
+                    if (Debugger.IsAttached)
+                    {
+                        throw;
+                    }
+                }
             });
         }
     }

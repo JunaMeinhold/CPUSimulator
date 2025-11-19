@@ -7,6 +7,7 @@
 		<Nullable>enable</Nullable>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<PublishAot>true</PublishAot>
+		<Platforms>AnyCPU;x64</Platforms>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -20,10 +21,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Hexa.NET.KittyUI" Version="1.1.1" />
-		<PackageReference Include="Hexa.NET.ImGui.Widgets" Version="1.2.5" />
-		<PackageReference Include="Hexa.NET.ImGui.Widgets.Extras" Version="1.0.3" />
-		<PackageReference Include="Microsoft.CodeAnalysis" Version="4.11.0" />
+		<PackageReference Include="Hexa.NET.KittyUI" Version="1.1.12" />
+		<PackageReference Include="Hexa.NET.ImGui.Widgets" Version="1.2.15" />
+		<PackageReference Include="Hexa.NET.ImGui.Widgets.Extras" Version="1.0.9" />
+		<PackageReference Include="Hexa.NET.Utilities" Version="2.2.5" />
+		<PackageReference Include="Microsoft.CodeAnalysis" Version="4.14.0" />
 	</ItemGroup>
 
 	<ItemGroup>

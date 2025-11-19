@@ -135,6 +135,12 @@
                 return;
             }
 
+            if (line.StartsWith("global", StringComparison.OrdinalIgnoreCase))
+            {
+                ParseGlobal(line);
+                return;
+            }
+
             int end = line.IndexOf(' ');
             if (end == -1) end = line.Length;
 
@@ -143,7 +149,7 @@
                 return;
             }
 
-            symbols.Add(offset, $"line: {lineIndex}, {line}");
+            symbols[offset] = $"line: {lineIndex}, {line}";
 
             if (TryParseSpecialInstruction(ref line, end))
             {
@@ -151,6 +157,11 @@
             }
 
             ParseInstruction(ref line, ref offset, end);
+        }
+
+        private void ParseGlobal(ReadOnlySpan<char> line)
+        {
+            throw new NotImplementedException();
         }
 
         private bool ParseLabel(ref ReadOnlySpan<char> line, ulong offset, ref int end)

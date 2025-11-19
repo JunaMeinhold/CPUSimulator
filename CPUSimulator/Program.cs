@@ -5,9 +5,9 @@ using System.Reflection;
 
 AppBuilder.Create()
     .StyleColorsDark()
-    .EnableLogging(false)
-    .EnableDebugTools(false)
-    .AddWindow<MainWindow>(true, true)
+    .EnableLogging(true)
+    .EnableDebugTools(true)
+    .AddWindow<MainWindow>()
     .SetTitle("CPU Simulator")
     .AddTitleBar<TitleBar>()
     .AddDefaultFont()
