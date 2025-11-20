@@ -208,7 +208,7 @@ Contributions are welcome! This is an educational project aimed at understanding
 
 ## License
 
-[License information to be added]
+This project is licensed under the MIT License. See the [LICENSE](https://github.com/JunaMeinhold/CPUSimulator/blob/master/LICENSE.txt) file for more details.
 
 ## Acknowledgments
 
