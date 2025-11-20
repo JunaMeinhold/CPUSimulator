@@ -44,6 +44,7 @@
         // 2 Operand instructions
 
         MOV,
+        LEA,
 
         ADD,
         SUB,

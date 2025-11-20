@@ -11,6 +11,7 @@ CPU Simulator is an educational and experimental project that implements a compl
 - **Memory System** - RAM, ROM, and MMU with configurable memory mapping
 - **Visual Debugging** - Real-time visualization of CPU state, registers, and memory
 - **Microcode Execution** - Step-by-step instruction execution with microcode-level control
+- **Cross-Platform** - Runs on Windows, Linux, and macOS
 
 ## Features
 
@@ -98,7 +99,7 @@ The simulator includes a custom assembly language with:
 ### Prerequisites
 
 - .NET 9 SDK or later
-- Windows (due to WinExe output type)
+- Supported platforms: Windows, Linux, macOS
 
 ### Build Steps
 

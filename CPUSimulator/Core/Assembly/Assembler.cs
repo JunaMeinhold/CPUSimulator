@@ -361,15 +361,42 @@
                 if (stream.TryRegister(out var registerAddress))
                 {
                     instruction.Flags |= firstOperator ? InstructionFlags.Source1AsAddress : InstructionFlags.Source2AsAddress;
+                    
+                    if (stream.TryOperator(Operator.Add))
+                    {
+                        if (stream.TryRegister(out var index))
+                        {
+                            instruction.Flags |= InstructionFlags.Index;
+                            instruction.Index = Instruction.Convert(index);
+
+                            if (stream.TryOperator(Operator.Multiply))
+                            {
+                                var scale = stream.ExpectNumber();
+                                instruction.Flags |= scale.Number.U8 switch
+                                {
+                                    1 => InstructionFlags.None,
+                                    2 => InstructionFlags.Scale2,
+                                    4 => InstructionFlags.Scale4,
+                                    8 => InstructionFlags.Scale8,
+                                    _ => throw new AssemblyException("Only scale of 1, 2, 4 and 8 is allowed.")
+                                };
+                            }
+
+                            if (stream.TryOperator(Operator.Add))
+                            {
+                                var displacement2 = stream.ExpectNumber(); 
+                                instruction.Flags |= InstructionFlags.Displacement;
+                                instruction.Displacement = displacement2.Number.U32;
+                            }
+                        }
+                        else if (stream.TryNumber(out var displacement))
+                        {
+                            instruction.Flags |= InstructionFlags.Displacement;
+                            instruction.Displacement = displacement.Number.U32;
+                        }
+                    }
                     stream.ExpectDelimiter(']');
                     return (0, Instruction.Convert(registerAddress));
-                }
-
-                if (stream.TryIdentifier(out var identifier))
-                {
-                    references.Add((instructionIndex, offset, identifier));
-                    stream.ExpectDelimiter(']');
-                    return (0, OperandSource.ImmAddress);
                 }
 
                 if (stream.TryNumber(out var number))

@@ -49,6 +49,7 @@
             keywords.Insert("add"u8, Keyword.ADD);
             keywords.Insert("and"u8, Keyword.AND);
             keywords.Insert("call"u8, Keyword.CALL);
+            keywords.Insert("lea"u8, Keyword.LEA);
             keywords.Insert("cli"u8, Keyword.CLI);
             keywords.Insert("cmp"u8, Keyword.CMP);
             keywords.Insert("cmps"u8, Keyword.CMPS);

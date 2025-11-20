@@ -11,6 +11,8 @@
         public OperandSource OperandSource2;
         public ulong Immediate;
         public InstructionFlags Flags;
+        public OperandSource Index;
+        public uint Displacement;
 
         public readonly bool IsRegister1 => OperandSource1 >= OperandSource.RAX && OperandSource1 < OperandSource.RegisterCount && !IsRegisterAddress1;
 
@@ -32,6 +34,8 @@
 
         public readonly RegisterAddress RegisterName2 => Convert(OperandSource2);
 
+        public readonly RegisterAddress RegisterNameIndex => Convert(Index);
+
         public static Instruction ReadFrom(ReadOnlySpan<byte> buffer)
         {
             Unsafe.SkipInit(out Instruction instruction);
@@ -49,6 +53,14 @@
             else if (OperandSource2 >= OperandSource.Imm8 && OperandSource2 <= OperandSource.ImmAddress)
             {
                 size += SizeOp(OperandSource2);
+            }
+            if ((Flags & InstructionFlags.Index) != 0)
+            {
+                size += 1;
+            }
+            if ((Flags & InstructionFlags.Displacement) != 0)
+            {
+                size += 4;
             }
 
             return size;
@@ -85,6 +97,18 @@
             else if ((Flags & InstructionFlags.ImmIsOperandDestination) != 0)
             {
                 idx += WriteOperator(buffer[idx..], OperandSource.Imm8, Immediate);
+            }
+
+            if ((Flags & InstructionFlags.Index) != 0)
+            {
+                buffer[idx] = (byte)Index;
+                idx += 1;
+            }
+
+            if ((Flags & InstructionFlags.Displacement) != 0)
+            {
+                BinaryPrimitives.WriteUInt32LittleEndian(buffer[idx..], Displacement);
+                idx += 4;
             }
 
             return idx;
@@ -135,6 +159,18 @@
             else if ((Flags & InstructionFlags.ImmIsOperandDestination) != 0)
             {
                 idx += ReadOperand(buffer[idx..], OperandSource.Imm8, out Immediate);
+            }
+
+            if ((Flags & InstructionFlags.Index) != 0)
+            {
+                Index = (OperandSource)buffer[idx];
+                idx += 1;
+            }
+
+            if ((Flags & InstructionFlags.Displacement) != 0)
+            {
+                Displacement = BinaryPrimitives.ReadUInt32LittleEndian(buffer[idx..]);
+                idx += 4;
             }
 
             return idx;

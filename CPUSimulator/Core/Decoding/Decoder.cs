@@ -32,6 +32,7 @@
                 OpCode.HLT => Halt.HALT(),
                 OpCode.CLI => Interrupts.ClearInterruptFlag(),
                 OpCode.STI => Interrupts.SetInterruptFlag(),
+                OpCode.LEA => LoadEffectiveAddress.LEA(instruction),
                 _ => throw new NotImplementedException(),
             };
         }

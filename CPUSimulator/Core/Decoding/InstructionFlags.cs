@@ -8,6 +8,8 @@
         ImmIsOperandDestination = 4,
         Scale2 = 8,
         Scale4 = 16,
-        Scale8 = 32,
+        Scale8 = Scale2 | Scale4,
+        Index = 32,
+        Displacement = 64,
     }
 }

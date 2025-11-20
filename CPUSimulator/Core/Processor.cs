@@ -164,6 +164,9 @@
 
                 if (token.IsCancellationRequested) return;
 
+                ComputeEffectiveAddress(ref instruction, InstructionFlags.Source1AsAddress, ref instruction.OperandSource1);
+                ComputeEffectiveAddress(ref instruction, InstructionFlags.Source2AsAddress, ref instruction.OperandSource2);
+
                 foreach (var microcode in Decoder.Decode(instruction))
                 {
                     // Fetch
@@ -259,6 +262,35 @@
 
                 long end = Stopwatch.GetTimestamp();
                 Latency = (end - start) / (double)Stopwatch.Frequency;
+            }
+        }
+
+        private unsafe void ComputeEffectiveAddress(ref Instruction instruction, InstructionFlags addressFlag, ref OperandSource source)
+        {
+            if ((instruction.Flags & addressFlag) != 0)
+            {
+                ulong baseAddress = Registers[(int)Instruction.Convert(source)].GetValue<ulong>();
+                byte scale = (instruction.Flags & InstructionFlags.Scale8) switch
+                {
+                    InstructionFlags.Scale2 => 2,
+                    InstructionFlags.Scale4 => 4,
+                    InstructionFlags.Scale8 => 8,
+                    _ => 1,
+                };
+                if ((instruction.Flags & InstructionFlags.Index) != 0)
+                {
+                    baseAddress += Registers[(int)instruction.RegisterNameIndex].GetValue<ulong>() * scale;
+                }
+                else
+                {
+                    baseAddress *= scale;
+                }
+
+                baseAddress += instruction.Displacement;
+
+                source = OperandSource.ImmAddress;
+                instruction.Flags &= ~addressFlag;
+                instruction.Immediate = baseAddress;
             }
         }
 
