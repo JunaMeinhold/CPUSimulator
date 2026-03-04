@@ -12,7 +12,7 @@
 
         uint Size { get; }
 
-        void Map(MemoryManagementUnit mmu, AddressRange range);
+        ulong Map(MemoryManagementUnit mmu, AddressRange range);
 
         void Reset();
 

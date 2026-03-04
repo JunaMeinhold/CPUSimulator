@@ -9,6 +9,7 @@
         {
             return instruction.OpCode switch
             {
+                OpCode.NOP => NoOp(),
                 OpCode.MOV => MoveData.MOV(instruction),
                 OpCode.ADD => MathOp(instruction, ALUFunction.Addition),
                 OpCode.SUB => MathOp(instruction, ALUFunction.Substraction),
@@ -37,6 +38,12 @@
             };
         }
 
+        private static IEnumerable<Microcode> NoOp()
+        {
+            MicrocodeBuilder builder = new();
+            yield return builder.SetMC(ControlUnitFlag.Step).SetALUFunction(ALUFunction.NoOperation).Build();
+        }
+
         public static IEnumerable<Microcode> SingleOp(Instruction instruction, ALUFunction function)
         {
             if (instruction.IsRegister1)
@@ -58,7 +65,7 @@
 
             if (instruction.IsRegister1 && instruction.IsImm2)
             {
-                yield return builder.SetMC(ControlUnitFlag.Step).SetXBus(instruction.RegisterName1).SetZBus(instruction.RegisterName1).Build(instruction.Immediate);
+                yield return builder.SetMC(ControlUnitFlag.Step).SetXBus(instruction.RegisterName1).SetZBus(instruction.RegisterName1).Build(instruction.Immediate2);
             }
             if (instruction.IsRegister1 && instruction.IsRegister2)
             {

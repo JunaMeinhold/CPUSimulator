@@ -54,6 +54,22 @@
             return token;
         }
 
+        public Token MakeToken(TokenType type, long value, byte* start, byte* end, uint length, uint columns, uint lines)
+        {
+            uint len = (uint)(end - start);
+            Token token = new()
+            {
+                Text = start,
+                Length = len,
+                Line = Line,
+                Column = Column,
+                Type = type,
+                Value = value
+            };
+            Advance(length, columns, lines);
+            return token;
+        }
+
         public Token MakeToken(Keyword keyword, byte* start, byte* end)
         {
             return MakeToken(TokenType.Keyword, (long)keyword, start, end);

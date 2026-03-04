@@ -19,7 +19,7 @@
 
         public Dictionary<ulong, string> Symbols => symbols;
 
-        public unsafe AssemblyResult Assemble(string code)
+        public unsafe AssemblyResult Assemble(StdString code)
         {
             labels.Clear();
             symbols.Clear();
@@ -32,9 +32,9 @@
             }
             sections.Clear();
 
-            var count = Encoding.UTF8.GetByteCount(code);
+            var count = code.Size;
             var text = AllocT<byte>(count + 1);
-            Encoding.UTF8.GetBytes(code, new Span<byte>(text, count));
+            Memcpy(code.Data, text, count);
             text[count] = 0;
 
             SourceText sourceText = new()
@@ -68,17 +68,17 @@
                             if (IsRelative(instruction->OpCode))
                             {
                                 var relative = (long)label.Offset - (long)offset;
-                                instruction->Immediate = *(ulong*)&relative;
+                                instruction->Immediate1 = *(ulong*)&relative;
                             }
                             else
                             {
-                                instruction->Immediate = label.Offset + BaseAddress;
+                                instruction->Immediate1 = label.Offset + BaseAddress;
                             }
 
                             break;
 
                         case SectionType.Data:
-                            instruction->Immediate = label.Offset + BaseAddress;
+                            instruction->Immediate1 = label.Offset + BaseAddress;
                             break;
 
                         case SectionType.RoData:
@@ -165,6 +165,14 @@
             return true;
         }
 
+        private static readonly HashSet<Keyword> sizeKeywords =
+        [
+            Keyword.Byte,
+            Keyword.Word,
+            Keyword.Dword,
+            Keyword.Qword
+        ];
+
         private void ParseInstruction(ref TokenStream stream, OpCode opCode, ref ulong offset)
         {
             if (current->Type != SectionType.Text)
@@ -176,16 +184,27 @@
             int instructionIndex = current->Instructions.Count;
 
             instruction.OpCode = opCode;
+            if (stream.TryKeyword(sizeKeywords, out var keyword))
+            {
+                instruction.Flags |= keyword switch
+                {
+                    Keyword.Byte => InstructionFlags.None,
+                    Keyword.Word => InstructionFlags.Width16,
+                    Keyword.Dword => InstructionFlags.Width32,
+                    Keyword.Qword => InstructionFlags.Width64,
+                    _ => throw new InvalidOperationException("Invalid size keyword.")
+                };
+            }
 
             if (opCode.IsBinary())
             {
-                (instruction.Immediate, instruction.OperandSource1) = ParseOperand(ref stream, ref instruction, true, instructionIndex, offset);
+                (instruction.Immediate1, instruction.OperandSource1) = ParseOperand(ref stream, ref instruction, true, instructionIndex, offset);
                 stream.ExpectDelimiter(',');
-                (instruction.Immediate, instruction.OperandSource2) = ParseOperand(ref stream, ref instruction, false, instructionIndex, offset);
+                (instruction.Immediate2, instruction.OperandSource2) = ParseOperand(ref stream, ref instruction, false, instructionIndex, offset);
             }
             else if (opCode.IsUnary())
             {
-                (instruction.Immediate, instruction.OperandSource1) = ParseOperand(ref stream, ref instruction, true, instructionIndex, offset);
+                (instruction.Immediate1, instruction.OperandSource1) = ParseOperand(ref stream, ref instruction, true, instructionIndex, offset);
             }
             else if (!opCode.HasNoOperands())
             {
@@ -306,16 +325,27 @@
 
         private void ParseDataDirective(ref TokenStream stream, int size)
         {
-            while (!stream.TryDelimiter(','))
+            do
             {
-                var token = stream.ExpectNumber();
-                ulong value = token.Number.U64;
-
-                for (int i = 0; i < size; i++)
+                if (size == 1 && stream.TryLiteral(out var literal))
                 {
-                    current->Data.Add((byte)((value >> (8 * i)) & 0xFF));
+                    for (int i = 0; i < literal.Length; i++)
+                    { 
+                        current->Data.Add(literal.Text[i]);
+                    }
                 }
-            }
+                else
+                {
+                    var token = stream.ExpectNumber(); 
+                    ulong value = token.Number.U64;
+
+                    for (int i = 0; i < size; i++)
+                    {
+                        current->Data.Add((byte)((value >> (8 * i)) & 0xFF));
+                    }
+                }
+               
+            } while (stream.TryDelimiter(','));
         }
 
         private void ParseSection(ref TokenStream stream)
@@ -361,10 +391,11 @@
                 if (stream.TryRegister(out var registerAddress))
                 {
                     instruction.Flags |= firstOperator ? InstructionFlags.Source1AsAddress : InstructionFlags.Source2AsAddress;
-                    
-                    if (stream.TryOperator(Operator.Add))
+
+                    bool negative = false;
+                    if (stream.TryOperator(Operator.Add) || (negative = stream.TryOperator(Operator.Subtract)))
                     {
-                        if (stream.TryRegister(out var index))
+                        if (!negative && stream.TryRegister(out var index))
                         {
                             instruction.Flags |= InstructionFlags.Index;
                             instruction.Index = Instruction.Convert(index);
@@ -382,17 +413,18 @@
                                 };
                             }
 
-                            if (stream.TryOperator(Operator.Add))
+                            if (stream.TryOperator(Operator.Add) || (negative = stream.TryOperator(Operator.Subtract)))
                             {
+                                
                                 var displacement2 = stream.ExpectNumber(); 
                                 instruction.Flags |= InstructionFlags.Displacement;
-                                instruction.Displacement = displacement2.Number.U32;
+                                instruction.Displacement = displacement2.Number.I32 | (negative ? unchecked((int)0b10000000_00000000_00000000_00000000) : 0);
                             }
                         }
                         else if (stream.TryNumber(out var displacement))
                         {
                             instruction.Flags |= InstructionFlags.Displacement;
-                            instruction.Displacement = displacement.Number.U32;
+                            instruction.Displacement = displacement.Number.I32 | (negative ? unchecked((int)0b10000000_00000000_00000000_00000000) : 0);
                         }
                     }
                     stream.ExpectDelimiter(']');
@@ -423,6 +455,11 @@
             if (stream.TryNumber(out var numberToken))
             {
                 return (numberToken.Number.U64, ConvertType(numberToken.NumberType));
+            }
+
+            if (stream.TryLiteral(out var lit) && lit.Length == 1) 
+            {
+                return (lit.Text[0], OperandSource.Imm8);
             }
 
             var token = stream.Current;

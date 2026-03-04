@@ -2,7 +2,7 @@
   "profiles": {
     "CPUSimulator": {
       "commandName": "Project",
-      "nativeDebugging": false
+      "nativeDebugging": true
     }
   }
 }

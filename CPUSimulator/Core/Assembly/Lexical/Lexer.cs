@@ -18,6 +18,11 @@
 
         static Lexer()
         {
+            keywords.Insert("byte"u8, Keyword.Byte);
+            keywords.Insert("word"u8, Keyword.Word);
+            keywords.Insert("dword"u8, Keyword.Dword);
+            keywords.Insert("qword"u8, Keyword.Qword);
+
             // Directives
             keywords.Insert("section"u8, Keyword.Section);
             keywords.Insert("global"u8, Keyword.Global);
@@ -283,6 +288,48 @@
                 }
             }
 
+            if (c == '"' || c == '\'')
+            {
+                byte quote = c;
+                byte* strStart = pCur + 1;
+                byte* strCur = strStart;
+                bool escaped = false;
+                uint columns = 0;
+                uint lines = 0;
+                while (strCur != pEnd)
+                {
+                    var ch = *strCur;
+                    bool cr = ch == '\r';
+                    if (cr || ch == '\n')
+                    {
+                        uint width = 1;
+                        if (cr && strCur + 1 != pEnd && strCur[1] == '\n')
+                        {
+                            width = 2;
+                        }
+                        strCur += width;
+                        ++lines;
+                        columns = 0;
+                        continue;
+                    }
+                    else if (escaped)
+                    {
+                        escaped = false;
+                    }
+                    else if (ch == '\\')
+                    {
+                        escaped = true;
+                    }
+                    else if (ch == quote)
+                    {
+                        return state.MakeToken(TokenType.Literal, quote, pCur + 1, strCur, (uint)((strCur - pCur) + 1), columns, lines);
+                    }
+                    ++strCur;
+                    ++columns;
+                }
+                throw new LexerException("Unterminated string literal.", source, idx, pCur);
+            }
+
             nuint matchLength;
             if (keywords.TryLookupLongestMatch(pCur, pEnd, out var keyword, out matchLength) && keyword != Keyword.Unknown)
             {
@@ -297,10 +344,9 @@
                 }
             }
 
-            bool sign = c == '-';
-            if (char.IsDigit((char)c) || (sign && pCur + 1 != pEnd && char.IsDigit((char)pCur[1])))
+            if (char.IsDigit((char)c))
             {
-                return ParseNumber(ref state, pCur + (sign ? 1 : 0), pEnd, sign);
+                return ParseNumber(ref state, pCur, pEnd, false);
             }
 
             if (operators.TryLookupLongestMatch(pCur, pEnd, out var op, out matchLength) && op != Operator.Unknown)
@@ -369,7 +415,7 @@
                     }
                     else
                     {
-                        throw new LexerException("Invalid hexadecimal digit.", state.Source, state.Index + (uint)(text - start), text);
+                        break;
                     }
                 }
                 else if (isBinary)
@@ -380,7 +426,7 @@
                     }
                     else
                     {
-                        throw new LexerException("Invalid binary digit.", state.Source, state.Index + (uint)(text - start), text);
+                        break;
                     }
                 }
                 else

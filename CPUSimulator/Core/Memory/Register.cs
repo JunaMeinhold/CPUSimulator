@@ -31,6 +31,8 @@
 
         public readonly uint Size => size;
 
+        public readonly byte* Memory => memory;
+
         public string DebugName => debugName;
 
         public RegisterAddress Address => address;

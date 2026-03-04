@@ -5,6 +5,10 @@
     public enum Keyword
     {
         Unknown,
+        Byte,
+        Word,
+        Dword,
+        Qword,
 
         // Directives
         Section,

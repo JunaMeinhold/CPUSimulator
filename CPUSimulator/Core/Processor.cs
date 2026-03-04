@@ -2,6 +2,7 @@
 {
     using CPUSimulator.Core.Buses;
     using CPUSimulator.Core.Decoding;
+    using CPUSimulator.Core.Devices;
     using CPUSimulator.Core.Memory;
     using System.Diagnostics;
     using static CPUSimulator.Core.MicrocodeFieldPositions;
@@ -13,6 +14,7 @@
         public readonly ArithmeticLogicalUnit ALU;
         public readonly RandomAccessMemory RAM;
         public readonly ReadonlyMemory ROM;
+        public readonly VideoDevice VideoDevice;
         public readonly Register[] Registers;
         public readonly InputBus<Register, Register> XBus;
         public readonly InputBus<Register, Register> YBus;
@@ -34,10 +36,13 @@
             ALU = new();
             ROM = new(4096);
             RAM = new(memory);
+            VideoDevice = new();
 
-            RAM.Map(MMU, new(0, 16384)); // stack.
-            ROM.Map(MMU, new(16384, 4096));
-            RAM.Map(MMU, new(16384 + 4096, memory - 16384, physicalOffset: 16384));
+            ulong mmuOffset = 0;
+            mmuOffset += RAM.Map(MMU, new(mmuOffset, 16384)); // stack.
+            mmuOffset += ROM.Map(MMU, new(mmuOffset, 4096));
+            mmuOffset += RAM.Map(MMU, new(mmuOffset, memory - 16384, physicalOffset: 16384));
+            _ = VideoDevice.Map(MMU, mmuOffset);
 
             RegisterAddress[] registerAddresses = Enum.GetValues<RegisterAddress>();
 
@@ -158,15 +163,15 @@
             bool* ioram = stackalloc bool[6];
             while (true)
             {
+                VideoDevice.Execute();
                 long start = Stopwatch.GetTimestamp();
                 HandlePendingInterrupts();
                 var instruction = CU.Fetch();
 
                 if (token.IsCancellationRequested) return;
 
-                ComputeEffectiveAddress(ref instruction, InstructionFlags.Source1AsAddress, ref instruction.OperandSource1);
-                ComputeEffectiveAddress(ref instruction, InstructionFlags.Source2AsAddress, ref instruction.OperandSource2);
-
+                ComputeEffectiveAddress(ref instruction, InstructionFlags.Source1AsAddress, ref instruction.OperandSource1, ref instruction.Immediate1);
+                ComputeEffectiveAddress(ref instruction, InstructionFlags.Source2AsAddress, ref instruction.OperandSource2, ref instruction.Immediate2);
                 foreach (var microcode in Decoder.Decode(instruction))
                 {
                     // Fetch
@@ -265,7 +270,7 @@
             }
         }
 
-        private unsafe void ComputeEffectiveAddress(ref Instruction instruction, InstructionFlags addressFlag, ref OperandSource source)
+        private unsafe void ComputeEffectiveAddress(ref Instruction instruction, InstructionFlags addressFlag, ref OperandSource source, ref ulong immediate)
         {
             if ((instruction.Flags & addressFlag) != 0)
             {
@@ -286,11 +291,18 @@
                     baseAddress *= scale;
                 }
 
-                baseAddress += instruction.Displacement;
+                if (instruction.Displacement < 0)
+                {
+                    baseAddress -= (uint)(instruction.Displacement & 0x7FFFFFFF);
+                }
+                else 
+                {
+                    baseAddress += (uint)instruction.Displacement;
+                }
 
                 source = OperandSource.ImmAddress;
                 instruction.Flags &= ~addressFlag;
-                instruction.Immediate = baseAddress;
+                immediate = baseAddress;
             }
         }
 

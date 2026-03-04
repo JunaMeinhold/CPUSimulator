@@ -116,6 +116,18 @@
             return false;
         }
 
+        public bool TryKeyword(HashSet<Keyword> keywords, out Keyword keyword)
+        {
+            if (current.IsKeyword && keywords.Contains((Keyword)current.Value))
+            {
+                keyword = (Keyword)current.Value;
+                Advance();
+                return true;
+            }
+            keyword = default;
+            return false;
+        }
+
         public bool TryDelimiter(char delimiter)
         {
             if (current.IsDelimiterOf(delimiter))

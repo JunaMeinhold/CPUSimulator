@@ -130,15 +130,14 @@ namespace CPUSimulator.Core
                 case ControlUnitFlag.InterruptReturn:
                     {
                         ulong rsp = RSP.GetValue<ulong>();
-                        Span<byte> buffer = stackalloc byte[12];
+                        Span<byte> buffer = stackalloc byte[16];
                         mmu.Execute(rsp, buffer, MMUAction.Read);
 
                         // Restore CC
-                        RFlags.CopyFrom(buffer[..4]);
-
+                        RFlags.CopyFrom(buffer[..8]);
                         // Restore RIP
                         mmu.Execute(rsp, buffer, MMUAction.Read);
-                        next = BinaryPrimitives.ReadUInt64LittleEndian(buffer[4..]);
+                        next = BinaryPrimitives.ReadUInt64LittleEndian(buffer[8..]);
                         rsp += RIP.Size + RFlags.Size;
 
                         RSP.SetValue(rsp);
@@ -161,15 +160,15 @@ namespace CPUSimulator.Core
             return result;
         }
 
-        public unsafe void HandleInterrupt(int interruptNumber)
+        public void HandleInterrupt(int interruptNumber)
         {
             // Save the current state onto the stack
             ulong rsp = RSP.GetValue<ulong>();
             rsp -= RIP.Size + RFlags.Size;
 
-            Span<byte> buffer = stackalloc byte[12];
-            RFlags.Value.CopyTo(buffer[..4]);
-            RIP.Value.CopyTo(buffer[4..]);
+            Span<byte> buffer = stackalloc byte[16];
+            RFlags.Value.CopyTo(buffer[..8]);
+            RIP.Value.CopyTo(buffer[8..]);
 
             mmu.Execute(rsp, buffer, MMUAction.Write);
 

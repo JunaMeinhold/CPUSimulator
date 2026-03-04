@@ -12,4 +12,9 @@ AppBuilder.Create()
     .AddTitleBar<TitleBar>()
     .AddDefaultFont()
     .AddFont("CascadiaMono", builder => builder.AddFontFromEmbeddedResource(Assembly.GetExecutingAssembly(), "CPUSimulator.CascadiaMono.ttf", 14))
+    .AddFont("CascadiaMonoEven", builder =>
+    {
+        builder.Config.GlyphMinAdvanceX = 14;
+        builder.AddFontFromEmbeddedResource(Assembly.GetExecutingAssembly(), "CPUSimulator.CascadiaMono.ttf", 14);
+    })
     .Run();

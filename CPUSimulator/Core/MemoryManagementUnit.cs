@@ -116,6 +116,8 @@
         public ulong End;
         public ulong PhysicalOffset;
 
+        public readonly ulong Length => End - Start;
+
         public AddressRange(ulong start, ulong length, ulong physicalOffset = 0)
         {
             Start = start;

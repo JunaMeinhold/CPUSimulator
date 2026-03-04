@@ -117,7 +117,7 @@
 
         public readonly StringSpan AsStringSpan()
         {
-            return new(Text, (int)Length);
+            return new(Text, Length);
         }
 
         public override readonly string ToString()

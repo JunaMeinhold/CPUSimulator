@@ -15,7 +15,7 @@
                       .SetMC(ControlUnitFlag.Jump)
                       .SetALUFunction(ALUFunction.PassY)
                       .SetIORAM(RAMIOFlags.ZRegisterWriteToRamData | RAMIOFlags.RamDataWriteToROM_MCOP)
-                      .Build(instruction.Immediate);
+                      .Build(instruction.Immediate1);
             }
             if (instruction.IsRegisterAddress1)
             {
@@ -50,7 +50,7 @@
                     .SetMC(ControlUnitFlag.Equals)
                     .SetALUFunction(ALUFunction.PassY)
                     .SetIORAM(RAMIOFlags.ZRegisterWriteToRamData | RAMIOFlags.RamDataWriteToROM_MCOP)
-                    .Build(instruction.Immediate);
+                    .Build(instruction.Immediate1);
             }
         }
 
@@ -63,7 +63,7 @@
                     .SetMC(ControlUnitFlag.Greater)
                     .SetALUFunction(ALUFunction.PassY)
                     .SetIORAM(RAMIOFlags.ZRegisterWriteToRamData | RAMIOFlags.RamDataWriteToROM_MCOP)
-                    .Build(instruction.Immediate));
+                    .Build(instruction.Immediate1));
             }
         }
 
@@ -76,7 +76,7 @@
                     .SetMC(ControlUnitFlag.Less)
                     .SetALUFunction(ALUFunction.PassY)
                     .SetIORAM(RAMIOFlags.ZRegisterWriteToRamData | RAMIOFlags.RamDataWriteToROM_MCOP)
-                    .Build(instruction.Immediate));
+                    .Build(instruction.Immediate1));
             }
         }
 
@@ -89,7 +89,7 @@
                     .SetMC(ControlUnitFlag.NotEquals)
                     .SetALUFunction(ALUFunction.PassY)
                     .SetIORAM(RAMIOFlags.ZRegisterWriteToRamData | RAMIOFlags.RamDataWriteToROM_MCOP)
-                    .Build(instruction.Immediate));
+                    .Build(instruction.Immediate1));
             }
         }
     }

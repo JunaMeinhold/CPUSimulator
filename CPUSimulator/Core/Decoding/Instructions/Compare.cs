@@ -11,7 +11,7 @@
 
             if (instruction.IsRegister1 && instruction.IsImm2)
             {
-                yield return builder.SetMC(ControlUnitFlag.Step).SetCC(true).SetALUFunction(ALUFunction.Compare).SetXBus(instruction.RegisterName1).Build(instruction.Immediate);
+                yield return builder.SetMC(ControlUnitFlag.Step).SetCC(true).SetALUFunction(ALUFunction.Compare).SetXBus(instruction.RegisterName1).Build(instruction.Immediate2);
             }
 
             if (instruction.IsRegister1 && instruction.IsRegister2)

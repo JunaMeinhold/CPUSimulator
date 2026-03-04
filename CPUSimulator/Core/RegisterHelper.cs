@@ -1,5 +1,7 @@
 ﻿namespace CPUSimulator.Core
 {
+    using CPUSimulator.Core.Decoding;
+    using CPUSimulator.Core.Memory;
     using System.Net;
 
     public class RegisterHelper
@@ -263,6 +265,34 @@
                 RegisterAddress.R14 => true,
                 RegisterAddress.R15 => true,
                 _ => false
+            };
+        }
+    }
+
+    public static class EnumExtensions
+    {
+        public static int GetImmSize(this OperandSource source)
+        {
+            return source switch
+            {
+                OperandSource.Imm8 => 1,
+                OperandSource.Imm16 => 2,
+                OperandSource.Imm32 => 4,
+                OperandSource.Imm64 => 8,
+                OperandSource.ImmAddress => 8,
+                _ => throw new ArgumentOutOfRangeException(nameof(source), $"Not an immediate source: {source}")
+            };
+        }
+
+        public static int GetRAMBusWidthSize(this RAMBusWidth width)
+        {
+            return width switch
+            {
+                RAMBusWidth.Bits8 => 1,
+                RAMBusWidth.Bits16 => 2,
+                RAMBusWidth.Bits32 => 4,
+                RAMBusWidth.Bits64 => 8,
+                _ => throw new ArgumentOutOfRangeException(nameof(width), $"Unknown RAM bus width: {width}")
             };
         }
     }

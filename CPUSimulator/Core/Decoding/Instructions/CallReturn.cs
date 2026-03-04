@@ -12,7 +12,7 @@
 
             if (instruction.IsImm1)
             {
-                yield return builder.SetMC(ControlUnitFlag.Call).SetALUFunction(ALUFunction.PassY).SetIORAM(RAMIOFlags.ZRegisterWriteToRamData | RAMIOFlags.RamDataWriteToROM_MCOP).Build(instruction.Immediate);
+                yield return builder.SetMC(ControlUnitFlag.Call).SetALUFunction(ALUFunction.PassY).SetIORAM(RAMIOFlags.ZRegisterWriteToRamData | RAMIOFlags.RamDataWriteToROM_MCOP).Build(instruction.Immediate1);
             }
             if (instruction.IsRegisterAddress1)
             {

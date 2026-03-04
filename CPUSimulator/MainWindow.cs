@@ -2,51 +2,44 @@
 {
     using CPUSimulator.Core;
     using CPUSimulator.Core.Assembly;
-    using CPUSimulator.Core.Assembly.Lexical;
     using CPUSimulator.Core.Memory;
     using Hexa.NET.ImGui;
     using Hexa.NET.ImGui.Widgets;
-    using Hexa.NET.ImGui.Widgets.Dialogs;
     using Hexa.NET.ImGui.Widgets.Extras.TextEditor;
     using Hexa.NET.KittyUI.ImGuiBackend;
     using Hexa.NET.Logging;
+    using Hexa.NET.Utilities;
     using Hexa.NET.Utilities.Text;
-    using Newtonsoft.Json.Linq;
     using System;
     using System.Buffers.Binary;
     using System.Diagnostics;
-    using System.Globalization;
-    using System.Net;
     using System.Numerics;
-    using System.Reflection.Emit;
+    using System.Runtime.CompilerServices;
 
     public class MainWindow : ImWindow
     {
-        private string? path;
+        private readonly string template = """
+            section .text
+            // org 16384
 
-        private string text = @"
-section .text
-// org 16384
+            start:
+                mov rsp, 16384 // Stack Base address
+                mov rax, 20480 // RAM Base address, jump to 0x4000 to see
+                
+                hlt
 
-start:
-    mov rsp, 16384
-    mov rax, 10
-    call func
-	mov rcx, 20480
-	mov [rcx], rbx
-    hlt
-
-func:
-    mov rbx, 200
-    ret
-";
+            section .data
+            """;
+        private readonly string? path;
+        private StdString text;
 
         private Task? task;
         private CancellationTokenSource cancellationTokenSource = new();
         private readonly Processor processor = new();
         private readonly Assembler assembler = new();
-        private MemoryViewSettings ramViewSettings = new();
-        private MemoryViewSettings romViewSettings = new();
+        private MemoryView ramViewSettings = new();
+        private MemoryView romViewSettings = new();
+        private readonly VideoMonitor videoMonitor;
 
         private readonly TextEditorTab textEditor = new("New File", new TextSource(string.Empty));
 
@@ -55,21 +48,25 @@ func:
         public MainWindow()
         {
             IsEmbedded = true;
+            videoMonitor = new VideoMonitor(processor.VideoDevice, processor.MMU);
+            text = new(template);
+            Flags |= ImGuiWindowFlags.MenuBar;
         }
 
         public override unsafe void DrawContent()
         {
+            DrawMenuBar();
             bool running = task != null && !task.IsCompleted;
             if (running)
             {
-                if (ImGui.Button("Stop"))
+                if (ImGui.Button("Stop"u8))
                 {
                     Stop();
                 }
             }
             else
             {
-                if (ImGui.Button("Execute"))
+                if (ImGui.Button("Execute"u8))
                 {
                     Execute();
                 }
@@ -144,12 +141,16 @@ func:
             if (ImGui.BeginTabBar("##TextEditor"))
             {
                 var avail = ImGui.GetContentRegionAvail();
-                //ImGuiManager.PushFont("CascadiaMono", 17);
+                ImGuiManager.PushFont("CascadiaMono", 17);
+                ImGui.PushStyleColor(ImGuiCol.FrameBg, 0x00);
                 //textEditor.Font = ImGui.GetFont();
                 //textEditor
-                //ImGuiManager.PopFont();
 
-                ImGui.InputTextMultiline("##d", ref text, 1024, avail, ImGuiInputTextFlags.AllowTabInput);
+                var capacity = text.Capacity;
+                if (capacity > 0) { ++capacity; }
+                ImGui.InputTextMultiline("##d", text.CStr(), (nuint)capacity, avail, ImGuiInputTextFlags.AllowTabInput | ImGuiInputTextFlags.CallbackResize, TextCallback, Unsafe.AsPointer(ref text));
+                ImGui.PopStyleColor();
+                ImGuiManager.PopFont();
 
                 if (ImGui.Shortcut((int)(ImGuiKey.ModCtrl | ImGuiKey.A)))
                 {
@@ -176,15 +177,86 @@ func:
 
             DisplayRegisters();
 
-            DisplayMemory("RAM", processor.RAM, processor.MMU, ref ramViewSettings);
-            DisplayMemory("ROM", processor.ROM, processor.MMU, ref romViewSettings);
+            ramViewSettings.DisplayMemory("RAM", processor.RAM, processor.MMU);
+            romViewSettings.DisplayMemory("ROM", processor.ROM, processor.MMU);
             DisplayStack(processor.RAM, processor.Registers[(int)RegisterAddress.RSP - 1], 16384);
+
+            DisplayALU(processor.ALU);
+            ImGuiManager.PushFont("CascadiaMono", 17);
+            videoMonitor.Draw();
+            ImGuiManager.PopFont();
+        }
+
+        private void DrawMenuBar()
+        {   
+            if (!ImGui.BeginMenuBar())
+            {
+                ImGui.EndMenuBar();
+                return;
+            }
+
+            if (ImGui.BeginMenu("File"u8))
+            {
+                if (ImGui.MenuItem("New"u8))
+                {
+                    text.Release();
+                    text = new(template);
+                }
+                ImGui.EndMenu();
+            }
+
+            ImGui.EndMenuBar();
+        }
+
+        private unsafe int TextCallback(ImGuiInputTextCallbackData* data)
+        {
+            if (data->EventFlag != ImGuiInputTextFlags.CallbackResize) return 0;
+            StdString* str = (StdString*)data->UserData;
+            str->Resize(data->BufTextLen);
+            data->Buf = str->CStr();
+            return 0;
+        }
+
+        public unsafe void DisplayRegister(in Register register, ReadOnlySpan<byte> label, Vector2 pos, Vector2 anchor)
+        {
+            ulong value = register.GetValue<ulong>();
+            byte* buf = stackalloc byte[256];
+            StrBuilder builder = new(buf, 256);
+            builder.Append("0x");
+            builder.AppendHex(value, true, true);
+            builder.End();
+            const float padding = 4.0f;
+            const float spacing = 4.0f;
+            var id = ImGui.GetID(label);
+            var labelSize = ImGui.CalcTextSize(label);
+            var valueSize = ImGui.CalcTextSize(builder);
+            var size = new Vector2(labelSize.X + valueSize.X + spacing, labelSize.Y) + new Vector2(padding * 2);
+            pos -= anchor * size;
+            ImRect rect = new(pos, pos + size);
+            if (!ImGuiP.ItemAdd(rect, id))
+            {
+                return;
+            }
+            var draw = ImGui.GetWindowDrawList();
+            float right = pos.X + labelSize.X + spacing;
+            float bottom = pos.Y + size.Y;
+            draw.AddQuadFilled(pos, new Vector2(right, pos.Y), new(right, bottom), new Vector2(pos.X, bottom), ImGui.GetColorU32(ImGuiCol.FrameBgActive));
+
+            float rightEnd = pos.X + size.X;
+            draw.AddQuadFilled(new(right, pos.Y), new Vector2(rightEnd, pos.Y), new(rightEnd, bottom), new Vector2(right, bottom), ImGui.GetColorU32(ImGuiCol.FrameBg));
+            var textCol = ImGui.GetColorU32(ImGuiCol.Text);
+            Vector2 textPos = pos + new Vector2(padding, padding);
+            draw.AddText(textPos, textCol, label);
+            textPos.X += labelSize.X + spacing;
+
+            draw.AddText(textPos, textCol, builder);
         }
 
         public unsafe void DisplayALU(ArithmeticLogicalUnit alu)
         {
             if (!ImGui.Begin("ALU"))
             {
+                ImGui.End();
                 return;
             }
 
@@ -196,8 +268,8 @@ func:
 
             var draw = ImGui.GetWindowDrawList();
             // Define ALU dimensions
-            float width = Math.Min(size.X, 200.0f);  // Cap the width for a consistent size
-            float height = Math.Min(size.Y, 120.0f); // Cap the height for a consistent size
+            float width = Math.Min(size.X, 200.0f) * 2;  // Cap the width for a consistent size
+            float height = Math.Min(size.Y, 120.0f) * 2; // Cap the height for a consistent size
 
             // Calculate ALU vertices relative to `pos`
             Vector2 topLeft = new Vector2(pos.X + (size.X - width) / 2, pos.Y + (size.Y - height) / 2);
@@ -211,58 +283,17 @@ func:
             draw.AddLine(bottomRight, bottomLeft, ImGui.GetColorU32(ImGuiCol.Text), 2.0f);
             draw.AddLine(bottomLeft, topLeft, ImGui.GetColorU32(ImGuiCol.Text), 2.0f);
 
-            {
-                // Add text label inside the ALU
-                string label = ComboEnumHelper<ALUFunction>.GetName(alu.Function);
-                Vector2 textSize = ImGui.CalcTextSize(label);
-                Vector2 textPos = new(
-                    topLeft.X + (width - textSize.X) / 2,
-                    topLeft.Y + (height - textSize.Y) / 2
-                );
-                draw.AddText(textPos, ImGui.GetColorU32(ImGuiCol.Text), label);
-            }
-            {
-                ulong value = alu.XRegister.GetValue<ulong>();
-                builder.Reset();
-                builder.Append("X: 0x");
-                builder.AppendHex(value, false, true);
-                builder.End();
+            string label = ComboEnumHelper<ALUFunction>.GetName(alu.Function);
+            Vector2 textSize = ImGui.CalcTextSize(label);
+            Vector2 textPos = new(
+                topLeft.X + (width - textSize.X) / 2,
+                topLeft.Y + (height - textSize.Y) / 2
+            );
+            draw.AddText(textPos, ImGui.GetColorU32(ImGuiCol.Text), label);
 
-                Vector2 textSize = ImGui.CalcTextSize(builder);
-                Vector2 textPos = new(
-                    topLeft.X,
-                    topLeft.Y - textSize.Y
-                );
-                draw.AddText(textPos, ImGui.GetColorU32(ImGuiCol.Text), builder);
-            }
-            {
-                ulong value = alu.YRegister.GetValue<ulong>();
-                builder.Reset();
-                builder.Append("Y: 0x");
-                builder.AppendHex(value, false, true);
-                builder.End();
-
-                Vector2 textSize = ImGui.CalcTextSize(builder);
-                Vector2 textPos = new(
-                    topRight.X - textSize.X,
-                    topLeft.Y - textSize.Y
-                );
-                draw.AddText(textPos, ImGui.GetColorU32(ImGuiCol.Text), builder);
-            }
-            {
-                ulong value = alu.ZRegister.GetValue<ulong>();
-                builder.Reset();
-                builder.Append("Z: 0x");
-                builder.AppendHex(value, false, true);
-                builder.End();
-
-                Vector2 textSize = ImGui.CalcTextSize(builder);
-                Vector2 textPos = new(
-                    topLeft.X + (width - textSize.X) / 2,
-                    bottomLeft.Y
-                );
-                draw.AddText(textPos, ImGui.GetColorU32(ImGuiCol.Text), builder);
-            }
+            DisplayRegister(alu.XRegister, "X"u8, new(topLeft.X, topLeft.Y), new(0.5f, 1));
+            DisplayRegister(alu.YRegister, "Y"u8, new(topRight.X, topLeft.Y), new(0.5f, 1));
+            DisplayRegister(alu.ZRegister, "Z"u8, new(topLeft.X + width * 0.5f, bottomLeft.Y), new(0.5f, 0));
 
             ImGui.End();
         }
@@ -337,7 +368,7 @@ func:
                         }
                         builder.End();
                         ImGui.Text(builder);
-                        TooltipValue(builder, register.GetValue<ulong>());
+                        register.GetValue<ulong>().TooltipValue(builder);
                     }
 
                     if (isOpen)
@@ -352,319 +383,6 @@ func:
 
                 ImGui.End();
             }
-        }
-
-        private static unsafe void TooltipValue(StrBuilder builder, ulong value, bool reverseEndianness = false)
-        {
-            if (ImGui.BeginItemTooltip())
-            {
-                if (reverseEndianness)
-                {
-                    value = BinaryPrimitives.ReverseEndianness(value);
-                }
-                builder.Reset(); builder.Append("Binary: "u8);
-                builder.AppendBinary(value, 64, 0);
-                builder.End(); ImGui.Text(builder);
-
-                builder.Reset(); builder.Append("Hexadecimal: 0x"u8);
-                builder.AppendHex(value, true, true);
-                builder.End(); ImGui.Text(builder);
-
-                builder.Reset(); builder.Append("Decimal (Unsigned): "u8);
-                builder.Append(value);
-                builder.End(); ImGui.Text(builder);
-
-                builder.Reset(); builder.Append("Decimal (Signed): "u8);
-                builder.Append(*(long*)&value);
-                builder.End(); ImGui.Text(builder);
-
-                builder.Reset(); builder.Append("Float: "u8);
-                builder.Append(*(float*)&value);
-                builder.End(); ImGui.Text(builder);
-
-                builder.Reset(); builder.Append("Double: "u8);
-                builder.Append(*(double*)&value);
-                builder.End(); ImGui.Text(builder);
-                ImGui.EndTooltip();
-            }
-        }
-
-        private JumpRequest? jumpToAddress;
-
-        private struct JumpRequest
-        {
-            public ulong Address;
-            public string Id;
-
-            public JumpRequest(ulong address, string id)
-            {
-                Address = address;
-                Id = id;
-            }
-        }
-
-        public class JumpDialog : Dialog
-        {
-            private string value = string.Empty;
-            public ulong Address;
-            public ulong Max;
-            public ulong Min;
-            public JumpMode Mode;
-
-            public enum JumpMode
-            {
-                Hexadecimal,
-                Decimal,
-            }
-
-            public override string Name { get; } = "Jump";
-
-            protected override ImGuiWindowFlags Flags { get; } = ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoDocking;
-
-            protected override unsafe void DrawContent()
-            {
-                ComboEnumHelper<JumpMode>.Combo("Mode", ref Mode);
-
-                if (ImGui.InputText("Address", ref value, 1024, ImGuiInputTextFlags.CharsDecimal | ImGuiInputTextFlags.CharsHexadecimal))
-                {
-                }
-
-                if (ImGui.Button("Cancel"))
-                {
-                    Close(DialogResult.Cancel);
-                }
-
-                ImGui.SameLine();
-
-                if (ImGui.Button("Jump") && ulong.TryParse(value, Mode == JumpMode.Hexadecimal ? NumberStyles.HexNumber : NumberStyles.Integer, CultureInfo.CurrentCulture, out var result))
-                {
-                    Address = Math.Clamp(result, Min, Max);
-                    Close(DialogResult.Ok);
-                }
-            }
-        }
-
-        public struct MemoryViewSettings
-        {
-            public uint BytesWidth;
-
-            public MemoryViewSettings()
-            {
-                BytesWidth = 4;
-            }
-        }
-
-        public unsafe void DisplayMemory(string label, IMemory memory, MemoryManagementUnit mmu, ref MemoryViewSettings settings)
-        {
-            if (!ImGui.Begin(label, ImGuiWindowFlags.MenuBar))
-            {
-                return;
-            }
-
-            if (ImGui.BeginMenuBar())
-            {
-                if (ImGui.MenuItem("Jump"u8))
-                {
-                    JumpDialog dialog = new()
-                    {
-                        Max = memory.Size,
-                        Userdata = label
-                    };
-                    dialog.Show((sender, result) =>
-                    {
-                        if (result == DialogResult.Ok && sender is JumpDialog jump)
-                        {
-                            jumpToAddress = new(jump.Address, (string)jump.Userdata!);
-                        }
-                    });
-                }
-                if (ImGui.BeginMenu("View"u8))
-                {
-                    if (ImGui.MenuItem("1 Byte"u8))
-                    {
-                        settings.BytesWidth = 1;
-                    }
-                    if (ImGui.MenuItem("2 Bytes"u8))
-                    {
-                        settings.BytesWidth = 2;
-                    }
-                    if (ImGui.MenuItem("4 Bytes"u8))
-                    {
-                        settings.BytesWidth = 4;
-                    }
-                    if (ImGui.MenuItem("8 Bytes"u8))
-                    {
-                        settings.BytesWidth = 8;
-                    }
-                    ImGui.EndMenu();
-                }
-                ImGui.EndMenuBar();
-            }
-
-            byte* buf = stackalloc byte[2048];
-            StrBuilder builder = new(buf, 2048);
-
-            ImGuiTableFlags flags =
-            ImGuiTableFlags.Reorderable |
-            ImGuiTableFlags.Resizable |
-            ImGuiTableFlags.Hideable |
-            ImGuiTableFlags.SizingFixedFit |
-            ImGuiTableFlags.ScrollX |
-            ImGuiTableFlags.ScrollY |
-            ImGuiTableFlags.PadOuterX | ImGuiTableFlags.ContextMenuInBody | ImGuiTableFlags.NoSavedSettings;
-
-            ulong marValue = mmu.MAR.GetValue<ulong>();
-
-            bool highlight = memory.Range.InRange(marValue);
-            marValue -= memory.Range.Start;
-            marValue += memory.Range.PhysicalOffset;
-
-            var avail = ImGui.GetContentRegionAvail();
-
-            uint busWidth = mmu.BusWidth switch
-            {
-                RAMBusWidth.Bits8 => 1,
-                RAMBusWidth.Bits16 => 2,
-                RAMBusWidth.Bits32 => 4,
-                RAMBusWidth.Bits64 => 8,
-                _ => 0,
-            };
-
-            uint byteWidth = settings.BytesWidth;
-
-            if (ImGui.BeginTable(label, 1 + (int)byteWidth, flags))
-            {
-                ImGui.TableSetupColumn("Address");
-                for (int i = 0; i < byteWidth; i++)
-                {
-                    builder.Reset();
-                    builder.Append("0x");
-                    builder.Append(i);
-                    builder.End();
-                    ImGui.TableSetupColumn(builder);
-                }
-                ImGui.TableSetupScrollFreeze(0, 1);
-                ImGui.TableHeadersRow();
-
-                float lineHeight = ImGui.GetTextLineHeightWithSpacing();
-
-                if (jumpToAddress.HasValue && jumpToAddress.Value.Id == label)
-                {
-                    int item = (int)(jumpToAddress.Value.Address / byteWidth);
-                    ImGui.SetScrollY(item * lineHeight);
-                    jumpToAddress = default;
-                }
-
-                float scroll = ImGui.GetScrollY();
-                int start = (int)Math.Floor(scroll / lineHeight) - 1;
-                int end = (int)Math.Ceiling(avail.Y / lineHeight) + start + 1;
-
-                int maxItems = (int)memory.Size / (int)byteWidth;
-
-                start = Math.Max(start, 0);
-                end = Math.Min(end, maxItems);
-
-                if (start > 0)
-                {
-                    ImGui.TableNextRow();
-                    ImGui.TableSetColumnIndex(0);
-                    ImGui.Dummy(new(1, start * lineHeight));
-                }
-
-                var draw = ImGui.GetWindowDrawList();
-
-                byte* buffer = stackalloc byte[8];
-
-                for (int i = start; i < end; i++)
-                {
-                    ulong baseAddress = (uint)i * byteWidth;
-
-                    ImGui.TableNextRow();
-                    ImGui.TableSetColumnIndex(0);
-                    builder.Reset();
-                    builder.Append("0x"u8);
-                    builder.AppendHex(baseAddress, true, true);
-                    builder.End();
-                    ImGui.Text(builder);
-
-                    for (int x = 0; x < byteWidth; x++)
-                    {
-                        ulong realAddress = baseAddress + (uint)x;
-                        byte data = memory.Data[realAddress];
-                        ImGui.TableSetColumnIndex(1 + x);
-                        builder.Reset();
-                        builder.AppendHex(data, true, true);
-                        builder.End();
-                        Vector2 startCur = ImGui.GetCursorScreenPos();
-                        if (highlight && realAddress >= marValue && realAddress < marValue + busWidth)
-                        {
-                            Vector2 endCur = startCur + ImGui.CalcTextSize(builder);
-                            Vector2 delta = endCur - startCur;
-                            draw.AddRectFilled(startCur, endCur, ImGui.GetColorU32(ImGuiCol.TextSelectedBg));
-                        }
-                        ImGui.Text(builder);
-                        if (ImGui.BeginItemTooltip())
-                        {
-                            byte* pData = memory.Data + realAddress;
-                            byte* pEnd = memory.Data + memory.Size;
-                            int length = (int)(pEnd - pData);
-                            int buffered = Math.Min(length, 8);
-                            Memcpy(pData, buffer, buffered);
-                            bool bigEndian = ImGui.IsKeyDown(ImGuiKey.LeftCtrl);
-                            if (bigEndian)
-                            {
-                                ImGui.Text("Big-Endian"u8);
-                            }
-                            else
-                            {
-                                ImGui.Text("Little-Endian"u8);
-                            }
-                            if (length >= 1)
-                            {
-                                ImGui.SeparatorText("8 Bit"u8);
-                                ImGui.Text(builder.MakeHex("Hex: "u8, buffer, 1, true, true, true, bigEndian));
-                                ImGui.Text(builder.MakeDecimal("Dec: "u8, buffer, 1, false, bigEndian));
-                                ImGui.Text(builder.MakeDecimal("Dec (signed): "u8, buffer, 1, true, bigEndian));
-                            }
-                            if (length >= 2)
-                            {
-                                ImGui.SeparatorText("16 Bit"u8);
-                                ImGui.Text(builder.MakeHex("Hex: "u8, buffer, 2, true, true, true, bigEndian));
-                                ImGui.Text(builder.MakeDecimal("Dec: "u8, buffer, 2, false, bigEndian));
-                                ImGui.Text(builder.MakeDecimal("Dec (signed): "u8, buffer, 2, true, bigEndian));
-                            }
-                            if (length >= 4)
-                            {
-                                ImGui.SeparatorText("32 Bit"u8);
-                                ImGui.Text(builder.MakeHex("Hex: "u8, buffer, 4, true, true, true, bigEndian));
-                                ImGui.Text(builder.MakeDecimal("Dec: "u8, buffer, 4, false, bigEndian));
-                                ImGui.Text(builder.MakeDecimal("Dec (signed): "u8, buffer, 4, true, bigEndian));
-                            }
-                            if (length >= 8)
-                            {
-                                ImGui.SeparatorText("64 Bit"u8);
-                                ImGui.Text(builder.MakeHex("Hex: "u8, buffer, 8, true, true, true, bigEndian));
-                                ImGui.Text(builder.MakeDecimal("Dec: "u8, buffer, 8, false, bigEndian));
-                                ImGui.Text(builder.MakeDecimal("Dec (signed): "u8, buffer, 8, true, bigEndian));
-                            }
-
-                            ImGui.TextDisabled("Hold (ctrl) for Big-Endian"u8);
-                            ImGui.EndTooltip();
-                        }
-                    }
-                }
-
-                int diffEnd = maxItems - end;
-                if (diffEnd > 0)
-                {
-                    ImGui.TableNextRow();
-                    ImGui.TableSetColumnIndex(0);
-                    ImGui.Dummy(new(1, diffEnd * lineHeight));
-                }
-
-                ImGui.EndTable();
-            }
-            ImGui.End();
         }
 
         public unsafe void DisplayStack(IMemory memory, in Register rsp, int size)
@@ -730,7 +448,7 @@ func:
                     builder.AppendHex(baseAddress, true, true);
                     builder.End();
                     ImGui.Text(builder);
-                    TooltipValue(builder, baseAddress);
+                    baseAddress.TooltipValue(builder);
                     ImGui.TableSetColumnIndex(1);
 
                     ulong stackvalue = BinaryPrimitives.ReadUInt64LittleEndian(new ReadOnlySpan<byte>(memory.Data + baseAddress, 8)) - assembler.BaseAddress;
@@ -939,159 +657,6 @@ func:
                     }
                 }
             });
-        }
-    }
-
-    public static unsafe class Extensions
-    {
-        public static StrBuilder MakeDecimal(this ref StrBuilder builder, ReadOnlySpan<byte> label, byte* values, int count, bool signed, bool bigEndian)
-        {
-            if (bigEndian)
-            {
-                byte* stack = stackalloc byte[count];
-                for (int i = 0; i < count; i++)
-                {
-                    stack[i] = values[count - i - 1];
-                }
-                values = stack;
-            }
-            builder.Reset();
-            builder.Append(label);
-            switch (count)
-            {
-                case 1:
-                    if (signed) builder.Append(*(sbyte*)values); else builder.Append((ushort)*values);
-                    break;
-
-                case 2:
-                    if (signed) builder.Append(*(short*)values); else builder.Append(*(ushort*)values);
-                    break;
-
-                case 4:
-                    if (signed) builder.Append(*(int*)values); else builder.Append(*(uint*)values);
-                    break;
-
-                case 8:
-                    if (signed) builder.Append(*(long*)values); else builder.Append(*(ulong*)values);
-                    break;
-            }
-            builder.End();
-            return builder;
-        }
-
-        public static StrBuilder MakeHex(this ref StrBuilder builder, ReadOnlySpan<byte> label, byte* values, int count, bool leadingZeros, bool uppercase, bool prefix, bool bigEndian)
-        {
-            if (bigEndian)
-            {
-                byte* stack = stackalloc byte[count];
-                for (int i = 0; i < count; i++)
-                {
-                    stack[i] = values[count - i - 1];
-                }
-                values = stack;
-            }
-            builder.Reset();
-            builder.Append(label);
-            if (prefix)
-            {
-                builder.Append("0x"u8);
-            }
-            builder.AppendHex(values, count, leadingZeros, uppercase);
-            builder.End();
-            return builder;
-        }
-
-        public static void AppendHex(this ref StrBuilder builder, byte* values, int count, bool leadingZeros, bool uppercase)
-        {
-            for (int i = count - 1; i >= 0; i--)
-            {
-                builder.AppendHex(values[i], leadingZeros, uppercase);
-            }
-        }
-
-        public static void AppendHexBigEndian(this ref StrBuilder builder, byte* values, int count, bool leadingZeros, bool uppercase)
-        {
-            for (int i = 0; i < count; i++)
-            {
-                builder.AppendHex(values[i], leadingZeros, uppercase);
-            }
-        }
-
-        public static void AppendHex(this ref StrBuilder builder, byte value, bool leadingZeros, bool uppercase)
-        {
-            builder.Index += Utf8Formatter.FormatHex(value, builder.Buffer + builder.Index, builder.Count - builder.Index, leadingZeros, uppercase);
-        }
-
-        public static void AppendHex(this ref StrBuilder builder, int value, bool leadingZeros, bool uppercase)
-        {
-            value = BinaryPrimitives.ReverseEndianness(value);
-            builder.Index += Utf8Formatter.FormatHex(value, builder.Buffer + builder.Index, builder.Count - builder.Index, leadingZeros, uppercase);
-        }
-
-        public static void AppendHex(this ref StrBuilder builder, uint value, bool leadingZeros, bool uppercase)
-        {
-            value = BinaryPrimitives.ReverseEndianness(value);
-            builder.Index += Utf8Formatter.FormatHex(value, builder.Buffer + builder.Index, builder.Count - builder.Index, leadingZeros, uppercase);
-        }
-
-        public static void AppendHex(this ref StrBuilder builder, long value, bool leadingZeros, bool uppercase)
-        {
-            value = BinaryPrimitives.ReverseEndianness(value);
-            builder.Index += Utf8Formatter.FormatHex(value, builder.Buffer + builder.Index, builder.Count - builder.Index, leadingZeros, uppercase);
-        }
-
-        public static void AppendHex(this ref StrBuilder builder, ulong value, bool leadingZeros, bool uppercase)
-        {
-            value = BinaryPrimitives.ReverseEndianness(value);
-            builder.Index += Utf8Formatter.FormatHex(value, builder.Buffer + builder.Index, builder.Count - builder.Index, leadingZeros, uppercase);
-        }
-
-        public static void AppendBinary(this ref StrBuilder builder, ulong value, int bits, int offset)
-        {
-            int capacity = builder.Count - builder.Index;
-            if (capacity < bits + 1)
-            {
-                return;
-            }
-
-            if (bits <= 0 || offset < 0 || offset + bits > 64)
-            {
-                return;
-            }
-
-            byte* buf = builder.Buffer + builder.Index;
-            for (int i = 0; i < bits; i++)
-            {
-                int bitOffset = offset + i;
-                byte bit = (byte)((value >> bitOffset) & 0x1);
-                buf[bits - i - 1] = (byte)('0' + bit);
-            }
-            buf[bits] = 0;
-            builder.Index += bits;
-        }
-
-        public static void AppendBinary(this ref StrBuilder builder, byte value, int bits, int offset)
-        {
-            int capacity = builder.Count - builder.Index;
-            if (capacity < bits + 1)
-            {
-                return;
-            }
-
-            if (bits <= 0 || offset < 0 || offset + bits > 64)
-            {
-                return;
-            }
-
-            byte* buf = builder.Buffer + builder.Index;
-            for (int i = 0; i < bits; i++)
-            {
-                int bitOffset = offset + i;
-                byte bit = (byte)((value >> bitOffset) & 0x1);
-                buf[bits - i - 1] = (byte)('0' + bit);
-            }
-            buf[bits] = 0;
-            builder.Index += bits;
         }
     }
 }

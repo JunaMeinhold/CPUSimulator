@@ -171,34 +171,46 @@
             return this;
         }
 
-        public readonly Microcode Build()
+        public Microcode Build()
         {
-            return new Microcode(_value);
+            var v = _value;
+            _value = 0;
+            return new Microcode(v);
         }
 
-        public readonly Microcode Build(byte constant)
+        public Microcode Build(byte constant)
         {
-            return new Microcode(_value, constant);
+            var v = _value;
+            _value = 0;
+            return new Microcode(v, constant);
         }
 
-        public readonly Microcode Build(short constant)
+        public Microcode Build(short constant)
         {
-            return new Microcode(_value, constant);
+            var v = _value;
+            _value = 0;
+            return new Microcode(v, constant);
         }
 
-        public readonly Microcode Build(int constant)
+        public Microcode Build(int constant)
         {
-            return new Microcode(_value, constant);
+            var v = _value;
+            _value = 0;
+            return new Microcode(v, constant);
         }
 
-        public readonly Microcode Build(long constant)
+        public Microcode Build(long constant)
         {
-            return new Microcode(_value, constant);
+            var v = _value;
+            _value = 0;
+            return new Microcode(v, constant);
         }
 
-        public readonly Microcode Build(ulong constant)
+        public Microcode Build(ulong constant)
         {
-            return new Microcode(_value, constant);
+            var v = _value;
+            _value = 0;
+            return new Microcode(v, constant);
         }
     }
 }

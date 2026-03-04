@@ -1,7 +1,5 @@
 ﻿namespace CPUSimulator.Core
 {
-    using Newtonsoft.Json.Linq;
-
     public unsafe struct Microcode
     {
         public ulong Code;

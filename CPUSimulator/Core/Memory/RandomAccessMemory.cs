@@ -24,10 +24,11 @@
 
         public AddressRange Range { get; private set; }
 
-        public void Map(MemoryManagementUnit mmu, AddressRange range)
+        public ulong Map(MemoryManagementUnit mmu, AddressRange range)
         {
             Range = range;
             mmu.Map(range, MMUExecute);
+            return range.Length;
         }
 
         private unsafe void MMUExecute(ulong address, Span<byte> span, MMUAction action)

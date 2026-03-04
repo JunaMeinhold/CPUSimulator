@@ -57,6 +57,8 @@
         RET,
         NOP,
         INT,
+
+        ExtendBit1 = 1 << 7,
     }
 
     public static class OpCodeExtensions

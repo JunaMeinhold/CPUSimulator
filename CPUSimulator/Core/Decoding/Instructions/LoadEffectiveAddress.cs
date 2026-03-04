@@ -12,7 +12,7 @@
                 .SetMC(ControlUnitFlag.Step)
                 .SetALUFunction(ALUFunction.PassY)
                 .SetZBus(instruction.RegisterName2)
-                .Build(instruction.Immediate);
+                .Build(instruction.Immediate1);
         }
     }
 }

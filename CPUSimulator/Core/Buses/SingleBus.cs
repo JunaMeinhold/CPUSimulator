@@ -1,7 +1,5 @@
 ﻿namespace CPUSimulator.Core.Buses
 {
-    using Hexa.NET.KittyUI.UI.NodeEditor;
-    using Newtonsoft.Json.Linq;
     using System.Buffers.Binary;
 
     /// <summary>
