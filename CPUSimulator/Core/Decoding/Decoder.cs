@@ -17,6 +17,7 @@
                 OpCode.DIV => MathOp(instruction, ALUFunction.Division),
                 OpCode.INC => SingleOp(instruction, ALUFunction.Increment),
                 OpCode.DEC => SingleOp(instruction, ALUFunction.Decrement),
+                OpCode.TEST => Compare.TEST(instruction),
                 OpCode.CMP => Compare.CMP(instruction),
                 OpCode.JMP => Jump.JMP(instruction),
                 OpCode.JE => Jump.JE(instruction),

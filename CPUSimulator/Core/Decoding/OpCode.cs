@@ -16,6 +16,7 @@
         XOR,
         AND,
 
+        TEST,
         CMP,
         CMPS,
         CMPSB,

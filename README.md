@@ -23,6 +23,7 @@ CPU Simulator is an educational and experimental project that implements a compl
 - **Register File** - General-purpose and special-purpose registers with sub-register support
 - **Bus System** - Input/Output buses for data transfer between components
 - **Interrupt Controller** - Hardware interrupt handling system
+- **Video Device** - Memory-mapped video output device with command-based interface
 
 ### Assembly Language
 
@@ -42,6 +43,8 @@ The simulator includes a custom assembly language with:
 - **Memory Inspector** - View and modify RAM/ROM contents
 - **Step Execution** - Step through instructions one at a time or run continuously
 - **Debug Tools** - Built-in debugging capabilities
+- **Video Output** - Memory-mapped video device with 160x90 framebuffer support
+- **Example Programs** - Sample assembly programs demonstrating features
 
 ## Technical Details
 
@@ -83,7 +86,10 @@ The simulator includes a custom assembly language with:
 - **.NET 9** - Latest .NET runtime with Native AOT support
 - **C# 13** - Modern C# with unsafe code for performance
 - **Hexa.NET.KittyUI** - ImGui-based UI framework
+- **Hexa.NET.ImGui.Widgets** - ImGui widget extensions
+- **Hexa.NET.ImGui.Widgets.Extras** - Additional UI components including TextEditor
 - **Hexa.NET.Utilities** - High-performance utility libraries
+- **Microsoft.CodeAnalysis** - Roslyn compiler platform
 - **Unsafe Code** - Pointer arithmetic and unmanaged memory for optimal performance
 
 ### Performance Features
@@ -145,11 +151,12 @@ message: dbs "Hello"    ; Define string
 ### Supported Instructions
 
 - **Data Movement**: `MOV`, `PUSH`, `POP`, `LEA`
-- **Arithmetic**: `ADD`, `SUB`, `MUL`, `DIV`, `INC`, `DEC`
-- **Logic**: `AND`, `OR`, `XOR`, `NOT`, `SHL`, `SHR`
-- **Control Flow**: `JMP`, `CALL`, `RET`, `JE`, `JNE`, `JG`, `JL`, etc.
-- **Comparison**: `CMP`, `TEST`
-- **Special**: `HALT`, `NOP`, `INT`
+- **Arithmetic**: `ADD`, `SUB`, `MUL`, `DIV`, `INC`, `DEC`, `NEG`
+- **Logic**: `AND`, `OR`, `XOR`, `NOT`
+- **Control Flow**: `JMP`, `CALL`, `RET`, `JE`, `JNE`, `JG`, `JGE`, `JL`, `JLE`, `JAE`, `JB`, `JBE`, `JC`, `JCXZ`, `JNZ`, `LOOP`, `LOOPNE`
+- **Comparison**: `CMP`, `TEST`, `CMPS`, `CMPSB`, `CMPSW`
+- **Interrupt Control**: `INT`, `CLI`, `STI`, `IRET`
+- **Special**: `HLT` (halt), `NOP` (no operation)
 
 ### Running Programs
 
@@ -168,18 +175,35 @@ CPUSimulator/
 │   │   ├── Lexical/        # Lexer and tokenization
 │   │   ├── Assembler.cs    # Main assembler
 │   │   ├── InstructionParser.cs
-│   │   └── RadixTree.cs    # Fast lookup data structure
+│   │   ├── RadixTree.cs    # Fast lookup data structure
+│   │   ├── TokenStream.cs  # Token streaming
+│   │   └── Section.cs      # Assembly section management
 │   ├── Buses/              # Bus system implementation
 │   ├── Decoding/           # Instruction decoding
-│   │   └── Instructions/   # Instruction implementations
+│   │   ├── Instructions/   # Instruction implementations
+│   │   ├── Decoder.cs      # Instruction decoder
+│   │   └── OpCode.cs       # Opcode definitions
+│   ├── Devices/            # Hardware device implementations
+│   │   └── VideoDevice.cs  # Memory-mapped video device
 │   ├── Memory/             # Memory subsystem
+│   │   ├── Register.cs     # Register implementation
+│   │   ├── RandomAccessMemory.cs
+│   │   └── ReadonlyMemory.cs
 │   ├── Processor.cs        # Main CPU implementation
 │   ├── ControlUnit.cs      # Control unit
 │   ├── ArithmeticLogicalUnit.cs
 │   ├── MemoryManagementUnit.cs
-│   └── InterruptController.cs
+│   ├── InterruptController.cs
+│   ├── Microcode.cs        # Microcode definitions
+│   └── MicrocodeBuilder.cs # Microcode generation
 ├── MainWindow.cs           # Main UI window
+├── VideoMonitor.cs         # Video output display
+├── MemoryView.cs           # Memory inspection view
+├── Asmx86SyntaxHighlight.cs # Assembly syntax highlighting
 ├── Program.cs              # Application entry point
+├── example/                # Example assembly programs
+│   ├── screen.asm          # Video device demo
+│   └── ascii.asm           # ASCII demo
 └── CPUSimulator.csproj     # Project file
 ```
 
@@ -187,9 +211,11 @@ CPUSimulator/
 
 ### Memory Map
 
-- **0x0000 - 0x3FFF** (0-16383): Stack space
+- **0x0000 - 0x3FFF** (0-16383): Stack space (RAM)
 - **0x4000 - 0x4FFF** (16384-20479): ROM (read-only, 4KB)
-- **0x5000+** (20480+): RAM (read-write, ~16MB)
+- **0x5000 - 0x104FFF** (20480-1069055): RAM (read-write, ~1MB)
+- **0x105000+** (1069056+): Video Device Control Memory (40 bytes)
+  - Command register, parameters, and framebuffer address
 
 ### Register Set
 
@@ -214,3 +240,8 @@ This project is licensed under the MIT License. See the [LICENSE](https://github
 
 - Built with [Hexa.NET.KittyUI](https://github.com/HexaEngine/Hexa.NET.KittyUI)
 - Uses [ImGui](https://github.com/ocornut/imgui) for UI rendering
+- Font: [Cascadia Mono](https://github.com/microsoft/cascadia-code) embedded for code display
+
+## Author
+
+**JunaMeinhold** - [GitHub Profile](https://github.com/JunaMeinhold)
