@@ -5,9 +5,9 @@
 
     public static class Decoder
     {
-        public static void Decode(MicrocodeQueue queue, in Instruction instruction)
+        public static bool Decode(MicrocodeQueue queue, in Instruction instruction)
         {
-            _ = instruction.OpCode switch
+            return instruction.OpCode switch
             {
                 OpCode.NOP => NoOp(queue),
                 OpCode.MOV => MoveData.MOV(queue, instruction),
@@ -35,7 +35,7 @@
                 OpCode.CLI => Interrupts.ClearInterruptFlag(queue),
                 OpCode.STI => Interrupts.SetInterruptFlag(queue),
                 OpCode.LEA => LoadEffectiveAddress.LEA(queue, instruction),
-                _ => throw new NotImplementedException(),
+                _ => false,
             };
         }
 
@@ -58,8 +58,9 @@
                     .SetXBus(instruction.RegisterName1)
                     .SetZBus(instruction.RegisterName1)
                     .Build());
+                return true;
             }
-            return true;
+            return false;
         }
 
         public static bool MathOp(MicrocodeQueue queue, in Instruction instruction, ALUFunction function)
@@ -69,7 +70,9 @@
             if (instruction.IsRegister1 && instruction.IsImm2)
             {
                 queue.Enqueue(builder.SetMC(ControlUnitFlag.Step).SetXBus(instruction.RegisterName1).SetZBus(instruction.RegisterName1).Build(instruction.Immediate2));
+                return true;
             }
+
             if (instruction.IsRegister1 && instruction.IsRegister2)
             {
                 queue.Enqueue(builder
@@ -79,8 +82,10 @@
                    .SetYBus(instruction.RegisterName2)
                    .SetZBus(instruction.RegisterName1)
                    .Build());
+                return true;
             }
-            return true;
+
+            return false;
         }
     }
 }

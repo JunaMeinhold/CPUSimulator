@@ -13,12 +13,16 @@
             if (instruction.IsImm1)
             {
                 queue.Enqueue(builder.SetMC(ControlUnitFlag.Call).SetALUFunction(ALUFunction.PassY).SetIORAM(RAMIOFlags.ZRegisterWriteToRamData | RAMIOFlags.RamDataWriteToROM_MCOP).Build(instruction.Immediate1));
+                return true;
             }
+
             if (instruction.IsRegisterAddress1)
             {
                 queue.Enqueue(builder.SetMC(ControlUnitFlag.Call).SetALUFunction(ALUFunction.PassX).SetXBus(instruction.RegisterName1).SetIORAM(RAMIOFlags.ZRegisterWriteToRamData | RAMIOFlags.RamDataWriteToROM_MCOP).Build());
+                return true;
             }
-            return true;
+
+            return false;
         }
 
         public static bool Return(MicrocodeQueue queue)

@@ -160,7 +160,7 @@
 
         public unsafe void Execute(CancellationToken token)
         {
-            MicrocodeQueue queue = new();
+            using MicrocodeQueue queue = new();
             bool* ioram = stackalloc bool[6];
             while (true)
             {

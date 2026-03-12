@@ -1,11 +1,12 @@
 ﻿namespace CPUSimulator.Core.Decoding
 {
     using CPUSimulator.Core;
+    using Hexa.NET.Utilities;
     using System.Collections;
 
-    public class MicrocodeQueue : IEnumerable<Microcode>
+    public class MicrocodeQueue : IEnumerable<Microcode>, IDisposable
     {
-        private readonly List<Microcode> queue = new();
+        private UnsafeList<Microcode> queue = new();
 
         public void Clear()
         {
@@ -21,7 +22,7 @@
 
         public Microcode this[int index] => queue[index];
 
-        public List<Microcode>.Enumerator GetEnumerator()
+        public UnsafeList<Microcode>.Enumerator GetEnumerator()
         {
             return queue.GetEnumerator();
         }
@@ -34,6 +35,12 @@
         IEnumerator IEnumerable.GetEnumerator()
         {
             return GetEnumerator();
+        }
+
+        public void Dispose()
+        {
+            queue.Release();
+            GC.SuppressFinalize(this);
         }
     }
 }
