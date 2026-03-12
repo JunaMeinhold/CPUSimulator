@@ -42,7 +42,9 @@
             mmuOffset += RAM.Map(MMU, new(mmuOffset, 16384)); // stack.
             mmuOffset += ROM.Map(MMU, new(mmuOffset, 4096));
             mmuOffset += RAM.Map(MMU, new(mmuOffset, memory - 16384, physicalOffset: 16384));
-            _ = VideoDevice.Map(MMU, mmuOffset);
+
+            ulong mmioOffset = 0xF000_0000;
+            _ = VideoDevice.Map(MMU, mmioOffset);
 
             RegisterAddress[] registerAddresses = Enum.GetValues<RegisterAddress>();
 

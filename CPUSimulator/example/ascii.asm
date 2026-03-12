@@ -22,7 +22,7 @@ start:
 
 flush: // flush video buffer, rax = framebuffer address
     push rbx
-    mov rbx, 16781312 // Video device base address
+    mov rbx, 0xF0000000 // Video device base address
     mov qword [rbx+32], rax // Set framebuffer address
     mov qword [rbx], 0x3    // 0x3 = Flush command
     pop rbx
@@ -30,7 +30,7 @@ flush: // flush video buffer, rax = framebuffer address
 
 setmode:
 	push r8
-	mov r8, 16781312
+	mov r8, 0xF0000000
 	mov qword [r8+8], 160 // Width
 	mov qword [r8+16], 90 // Height
 	mov qword [r8+24], 0  // ASCII-Mode
