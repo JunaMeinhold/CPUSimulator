@@ -5,79 +5,82 @@
 
     public static class Decoder
     {
-        public static IEnumerable<Microcode> Decode(Instruction instruction)
+        public static void Decode(MicrocodeQueue queue, in Instruction instruction)
         {
-            return instruction.OpCode switch
+            _ = instruction.OpCode switch
             {
-                OpCode.NOP => NoOp(),
-                OpCode.MOV => MoveData.MOV(instruction),
-                OpCode.ADD => MathOp(instruction, ALUFunction.Addition),
-                OpCode.SUB => MathOp(instruction, ALUFunction.Substraction),
-                OpCode.MUL => MathOp(instruction, ALUFunction.Multiplication),
-                OpCode.DIV => MathOp(instruction, ALUFunction.Division),
-                OpCode.INC => SingleOp(instruction, ALUFunction.Increment),
-                OpCode.DEC => SingleOp(instruction, ALUFunction.Decrement),
-                OpCode.TEST => Compare.TEST(instruction),
-                OpCode.CMP => Compare.CMP(instruction),
-                OpCode.JMP => Jump.JMP(instruction),
-                OpCode.JE => Jump.JE(instruction),
-                OpCode.JG => Jump.JG(instruction),
-                OpCode.JL => Jump.JL(instruction),
-                OpCode.JGE => Jump.JGE(instruction),
-                OpCode.JLE => Jump.JLE(instruction),
-                OpCode.JNE => Jump.JNE(instruction),
-                OpCode.JNZ => Jump.JNE(instruction),
-                OpCode.CALL => CallReturn.Call(instruction),
-                OpCode.RET => CallReturn.Return(),
-                OpCode.PUSH => Stack.Push(instruction),
-                OpCode.POP => Stack.Pop(instruction),
-                OpCode.HLT => Halt.HALT(),
-                OpCode.CLI => Interrupts.ClearInterruptFlag(),
-                OpCode.STI => Interrupts.SetInterruptFlag(),
-                OpCode.LEA => LoadEffectiveAddress.LEA(instruction),
+                OpCode.NOP => NoOp(queue),
+                OpCode.MOV => MoveData.MOV(queue, instruction),
+                OpCode.ADD => MathOp(queue, instruction, ALUFunction.Addition),
+                OpCode.SUB => MathOp(queue, instruction, ALUFunction.Substraction),
+                OpCode.MUL => MathOp(queue, instruction, ALUFunction.Multiplication),
+                OpCode.DIV => MathOp(queue, instruction, ALUFunction.Division),
+                OpCode.INC => SingleOp(queue, instruction, ALUFunction.Increment),
+                OpCode.DEC => SingleOp(queue, instruction, ALUFunction.Decrement),
+                OpCode.TEST => Compare.TEST(queue, instruction),
+                OpCode.CMP => Compare.CMP(queue, instruction),
+                OpCode.JMP => Jump.JMP(queue, instruction),
+                OpCode.JE => Jump.JE(queue, instruction),
+                OpCode.JG => Jump.JG(queue, instruction),
+                OpCode.JL => Jump.JL(queue, instruction),
+                OpCode.JGE => Jump.JGE(queue, instruction),
+                OpCode.JLE => Jump.JLE(queue, instruction),
+                OpCode.JNE => Jump.JNE(queue, instruction),
+                OpCode.JNZ => Jump.JNE(queue, instruction),
+                OpCode.CALL => CallReturn.Call(queue, instruction),
+                OpCode.RET => CallReturn.Return(queue),
+                OpCode.PUSH => StackInstr.Push(queue, instruction),
+                OpCode.POP => StackInstr.Pop(queue, instruction),
+                OpCode.HLT => Halt.HALT(queue),
+                OpCode.CLI => Interrupts.ClearInterruptFlag(queue),
+                OpCode.STI => Interrupts.SetInterruptFlag(queue),
+                OpCode.LEA => LoadEffectiveAddress.LEA(queue, instruction),
                 _ => throw new NotImplementedException(),
             };
         }
 
-        private static IEnumerable<Microcode> NoOp()
+        private static bool NoOp(MicrocodeQueue queue)
         {
             MicrocodeBuilder builder = new();
-            yield return builder.SetMC(ControlUnitFlag.Step).SetALUFunction(ALUFunction.NoOperation).Build();
+            queue.Enqueue(builder.SetMC(ControlUnitFlag.Step).SetALUFunction(ALUFunction.NoOperation).Build());
+            return true;
         }
 
-        public static IEnumerable<Microcode> SingleOp(Instruction instruction, ALUFunction function)
+        public static bool SingleOp(MicrocodeQueue queue, in Instruction instruction, ALUFunction function)
         {
             if (instruction.IsRegister1)
             {
                 MicrocodeBuilder builder = new();
-                yield return builder
+                queue.Enqueue(builder
                     .SetMC(ControlUnitFlag.Step)
                     .SetCC(true)
                     .SetALUFunction(function)
                     .SetXBus(instruction.RegisterName1)
                     .SetZBus(instruction.RegisterName1)
-                    .Build();
+                    .Build());
             }
+            return true;
         }
 
-        public static IEnumerable<Microcode> MathOp(Instruction instruction, ALUFunction function)
+        public static bool MathOp(MicrocodeQueue queue, in Instruction instruction, ALUFunction function)
         {
             MicrocodeBuilder builder = new MicrocodeBuilder().SetALUFunction(function);
 
             if (instruction.IsRegister1 && instruction.IsImm2)
             {
-                yield return builder.SetMC(ControlUnitFlag.Step).SetXBus(instruction.RegisterName1).SetZBus(instruction.RegisterName1).Build(instruction.Immediate2);
+                queue.Enqueue(builder.SetMC(ControlUnitFlag.Step).SetXBus(instruction.RegisterName1).SetZBus(instruction.RegisterName1).Build(instruction.Immediate2));
             }
             if (instruction.IsRegister1 && instruction.IsRegister2)
             {
-                yield return builder
+                queue.Enqueue(builder
                    .SetMC(ControlUnitFlag.Step)
                    .SetCC(true)
                    .SetXBus(instruction.RegisterName1)
                    .SetYBus(instruction.RegisterName2)
                    .SetZBus(instruction.RegisterName1)
-                   .Build();
+                   .Build());
             }
+            return true;
         }
     }
 }

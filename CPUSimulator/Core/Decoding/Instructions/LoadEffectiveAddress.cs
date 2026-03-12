@@ -5,14 +5,15 @@
 
     public static class LoadEffectiveAddress
     {
-        public static IEnumerable<Microcode> LEA(Instruction instruction)
+        public static bool LEA(MicrocodeQueue queue, in Instruction instruction)
         {
             MicrocodeBuilder builder = new();
-            yield return builder
+            queue.Enqueue(builder
                 .SetMC(ControlUnitFlag.Step)
                 .SetALUFunction(ALUFunction.PassY)
                 .SetZBus(instruction.RegisterName2)
-                .Build(instruction.Immediate1);
+                .Build(instruction.Immediate1));
+            return true;
         }
     }
 }

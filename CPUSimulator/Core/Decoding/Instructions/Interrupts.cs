@@ -4,16 +4,18 @@
 
     public static class Interrupts
     {
-        public static IEnumerable<Microcode> ClearInterruptFlag()
+        public static bool ClearInterruptFlag(MicrocodeQueue queue)
         {
             MicrocodeBuilder builder = new();
-            yield return builder.SetMC(ControlUnitFlag.InterruptClearFlag).Build();
+            queue.Enqueue(builder.SetMC(ControlUnitFlag.InterruptClearFlag).Build());
+            return true;
         }
 
-        public static IEnumerable<Microcode> SetInterruptFlag()
+        public static bool SetInterruptFlag(MicrocodeQueue queue)
         {
             MicrocodeBuilder builder = new();
-            yield return builder.SetMC(ControlUnitFlag.InterruptSetFlag).Build();
+            queue.Enqueue(builder.SetMC(ControlUnitFlag.InterruptSetFlag).Build());
+            return true;
         }
     }
 }

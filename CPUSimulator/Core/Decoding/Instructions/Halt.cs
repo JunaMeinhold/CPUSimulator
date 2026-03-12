@@ -4,10 +4,11 @@
 
     public static class Halt
     {
-        public static IEnumerable<Microcode> HALT()
+        public static bool HALT(MicrocodeQueue queue)
         {
             MicrocodeBuilder builder = new();
-            yield return builder.SetMC(ControlUnitFlag.Halt).Build();
+            queue.Enqueue(builder.SetMC(ControlUnitFlag.Halt).Build());
+            return true;
         }
     }
 }

@@ -213,8 +213,8 @@ CPUSimulator/
 
 - **0x0000 - 0x3FFF** (0-16383): Stack space (RAM)
 - **0x4000 - 0x4FFF** (16384-20479): ROM (read-only, 4KB)
-- **0x5000 - 0x104FFF** (20480-1069055): RAM (read-write, ~1MB)
-- **0x105000+** (1069056+): Video Device Control Memory (40 bytes)
+- **0x5000 - 0x1003FFF** (20480-16793599): RAM (read-write, ~16MB)
+- **0x1004000+** (16793600+): Video Device Control Memory (40 bytes)
   - Command register, parameters, and framebuffer address
 
 ### Register Set

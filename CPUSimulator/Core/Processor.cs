@@ -160,6 +160,7 @@
 
         public unsafe void Execute(CancellationToken token)
         {
+            MicrocodeQueue queue = new();
             bool* ioram = stackalloc bool[6];
             while (true)
             {
@@ -172,7 +173,10 @@
 
                 ComputeEffectiveAddress(ref instruction, InstructionFlags.Source1AsAddress, ref instruction.OperandSource1, ref instruction.Immediate1);
                 ComputeEffectiveAddress(ref instruction, InstructionFlags.Source2AsAddress, ref instruction.OperandSource2, ref instruction.Immediate2);
-                foreach (var microcode in Decoder.Decode(instruction))
+                
+                queue.Clear();
+                Decoder.Decode(queue, instruction);
+                foreach (var microcode in queue)
                 {
                     // Fetch
                     ulong code = microcode.Code;
