@@ -1,6 +1,10 @@
 ﻿namespace CPUSimulator.Core.Assembly.Lexical
 {
     using CPUSimulator.Core.Decoding;
+    using Hexa.NET.DXGI;
+    using Hexa.NET.Mathematics;
+    using System.Runtime.Intrinsics.Arm;
+    using System.Security.Cryptography;
 
     public enum Keyword
     {
@@ -228,7 +232,118 @@
 
         public static RegisterAddress ToRegisterAddress(this Keyword keyword)
         {
-            return (RegisterAddress)(keyword - Keyword.RAX + 1);
+            return keyword switch
+            {
+                Keyword.RAX => RegisterAddress.RAX,       // Full 64-bit register
+                Keyword.EAX => RegisterAddress.EAX,       // Lower 32 bits of RAX
+                Keyword.AX => RegisterAddress.AX,         // Lower 16 bits of RAX
+                Keyword.AL => RegisterAddress.AL,         // Lower 8 bits of AX
+                Keyword.AH => RegisterAddress.AH,         // Upper 8 bits of AX
+                // RBX Family
+
+                Keyword.RBX => RegisterAddress.RBX,
+                Keyword.EBX => RegisterAddress.EBX,
+                Keyword.BX => RegisterAddress.BX,
+                Keyword.BL => RegisterAddress.BL,
+                Keyword.BH => RegisterAddress.BH,
+
+                // RCX Family
+
+                Keyword.RCX => RegisterAddress.RCX,
+                Keyword.ECX => RegisterAddress.ECX,
+                Keyword.CX => RegisterAddress.CX,
+                Keyword.CL => RegisterAddress.CL,
+                Keyword.CH => RegisterAddress.CH,
+
+                // RDX Family
+
+                Keyword.RDX => RegisterAddress.RDX,
+                Keyword.EDX => RegisterAddress.EDX,
+                Keyword.DX => RegisterAddress.DX,
+                Keyword.DL => RegisterAddress.DL,
+                Keyword.DH => RegisterAddress.DH,
+
+                // Other Registers (no sub-registers)
+
+                Keyword.RSP => RegisterAddress.RSP,
+                Keyword.RBP => RegisterAddress.RBP,
+                Keyword.RDI => RegisterAddress.RDI,
+                Keyword.RSI => RegisterAddress.RSI,
+
+                // R8 Family
+
+                Keyword.R8 => RegisterAddress.R8,       // Full 64-bit register
+                Keyword.R8D => RegisterAddress.R8D,      // Lower 32 bits of R8
+                Keyword.R8W => RegisterAddress.R8W,      // Lower 16 bits of R8
+                Keyword.R8B => RegisterAddress.R8B,      // Lower 8 bits of R8
+
+                // R9 Family
+
+                Keyword.R9 => RegisterAddress.R9,
+                Keyword.R9D => RegisterAddress.R9D,
+                Keyword.R9W => RegisterAddress.R9W,
+                Keyword.R9B => RegisterAddress.R9B,
+
+                // R10 Family
+
+                Keyword.R10 => RegisterAddress.R10,
+                Keyword.R10D => RegisterAddress.R10D,
+                Keyword.R10W => RegisterAddress.R10W,
+                Keyword.R10B => RegisterAddress.R10B,
+
+                // R11 Family
+
+                Keyword.R11 => RegisterAddress.R11,
+                Keyword.R11D => RegisterAddress.R11D,
+                Keyword.R11W => RegisterAddress.R11W,
+                Keyword.R11B => RegisterAddress.R11B,
+
+                // R12 Family
+
+                Keyword.R12 => RegisterAddress.R12,
+                Keyword.R12D => RegisterAddress.R12D,
+                Keyword.R12W => RegisterAddress.R12W,
+                Keyword.R12B => RegisterAddress.R12B,
+
+                // R13 Family
+
+                Keyword.R13 => RegisterAddress.R13,
+                Keyword.R13D => RegisterAddress.R13D,
+                Keyword.R13W => RegisterAddress.R13W,
+                Keyword.R13B => RegisterAddress.R13B,
+
+                // R14 Family
+
+                Keyword.R14 => RegisterAddress.R14,
+                Keyword.R14D => RegisterAddress.R14D,
+                Keyword.R14W => RegisterAddress.R14W,
+                Keyword.R14B => RegisterAddress.R14B,
+
+                // R15 Family
+
+                Keyword.R15 => RegisterAddress.R15,
+                Keyword.R15D => RegisterAddress.R15D,
+                Keyword.R15W => RegisterAddress.R15W,
+                Keyword.R15B => RegisterAddress.R15B,
+
+                Keyword.XMM0 => RegisterAddress.XMM0,
+                Keyword.XMM1 => RegisterAddress.XMM1,
+                Keyword.XMM2 => RegisterAddress.XMM2,
+                Keyword.XMM3 => RegisterAddress.XMM3,
+                Keyword.XMM4 => RegisterAddress.XMM4,
+                Keyword.XMM5 => RegisterAddress.XMM5,
+                Keyword.XMM6 => RegisterAddress.XMM6,
+                Keyword.XMM7 => RegisterAddress.XMM7,
+                Keyword.XMM8 => RegisterAddress.XMM8,
+                Keyword.XMM9 => RegisterAddress.XMM9,
+                Keyword.XMM10 => RegisterAddress.XMM10,
+                Keyword.XMM11 => RegisterAddress.XMM11,
+                Keyword.XMM12 => RegisterAddress.XMM12,
+                Keyword.XMM13 => RegisterAddress.XMM13,
+                Keyword.XMM14 => RegisterAddress.XMM14,
+                Keyword.XMM15 => RegisterAddress.XMM15,
+                _ => throw new InvalidOperationException($"Keyword {keyword} is not a register.")
+            };
         }
 
         public static bool IsOpCode(this Keyword keyword)

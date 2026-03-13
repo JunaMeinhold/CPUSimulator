@@ -62,13 +62,14 @@
             Memset(memory, 0, size);
         }
 
-        public readonly void CopyFrom(Span<byte> other)
+        public readonly void CopyFrom(Span<byte> src)
         {
+            if (src.Length == 0 || size == 0) return;
             Reset();
-            var toCopy = Math.Min(size, other.Length);
-            fixed (byte* mem = other)
+            var toCopy = Math.Min(size, src.Length);
+            fixed (byte* pSrc = src)
             {
-                Memcpy(mem, memory, toCopy);
+                Memcpy(pSrc, memory, toCopy);
             }
         }
 

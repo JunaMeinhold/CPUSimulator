@@ -103,6 +103,6 @@
         R15D,
         R15W,
         R15B,
-        RegisterCount
+        RegisterCount = 0xFF
     }
 }

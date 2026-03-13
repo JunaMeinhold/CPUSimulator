@@ -2,7 +2,6 @@
 {
     using CPUSimulator.Core.Decoding;
     using CPUSimulator.Core.Memory;
-    using System.Net;
 
     public class RegisterHelper
     {
@@ -116,6 +115,11 @@
                 // Default case
                 _ => throw new ArgumentOutOfRangeException(nameof(address), $"Unknown register: {address}")
             };
+        }
+
+        public static RegisterBank GetRegisterBank(RegisterAddress address)
+        {
+            return (RegisterBank)(((byte)address) >> 4);
         }
 
         public static int GetRegisterOffset(RegisterAddress address)

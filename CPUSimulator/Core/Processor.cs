@@ -16,9 +16,7 @@
         public readonly ReadonlyMemory ROM;
         public readonly VideoDevice VideoDevice;
         public readonly Register[] Registers;
-        public readonly InputBus<Register, Register> XBus;
-        public readonly InputBus<Register, Register> YBus;
-        public readonly OutputBus<Register, Register> ZBus;
+        public readonly Multiplexer<Register> Multiplexer;
         public readonly SingleBus<Register, Register> YMDRBus;
         public readonly InputBus<Register, Register> ORAMBus;
         public readonly OutputBus<Register, Register> IRAMBus;
@@ -49,10 +47,14 @@
             RegisterAddress[] registerAddresses = Enum.GetValues<RegisterAddress>();
 
             Registers = new Register[RegisterHelper.RegisterCount];
-            var parentMap = new Dictionary<RegisterAddress, Register>();
-            for (int i = 1; i < registerAddresses.Length; i++)
+            Multiplexer = new(4, 4); // 4 bit for Bank, 4 bit for Index
+
+            Dictionary<RegisterAddress, Register> parentMap = [];
+            Dictionary<RegisterBank, List<Register>> bankRegisters = [];
+            for (int i = 0; i < registerAddresses.Length; i++)
             {
                 RegisterAddress registerAddress = registerAddresses[i];
+                if (registerAddress == RegisterAddress.Disabled) continue;
                 string name = registerAddress.ToString();
 
                 int size = RegisterHelper.GetRegisterSize(registerAddress);
@@ -70,17 +72,34 @@
                 }
                 Registers[i - 1] = register;
 
+                var bank = RegisterHelper.GetRegisterBank(registerAddress);
+                if (!bankRegisters.TryGetValue(bank, out var list))
+                {
+                    list = [];
+                    bankRegisters[bank] = list;
+                }
+                list.Add(register);
+
                 if (parent == null)
                 {
                     parentMap[registerAddress] = register;
                 }
             }
 
+            foreach (var bank in Enum.GetValues<RegisterBank>())
+            {
+                if (bankRegisters.TryGetValue(bank, out var list))
+                {
+                    Multiplexer.AddBank([.. list]);
+                }
+                else
+                {
+                    Multiplexer.AddBank([]);
+                }
+            }
+
             CU = new(MMU, Registers[(int)RegisterAddress.RSP - 1], romStart: 16384, 0);
 
-            XBus = new(ALU.XRegister, Registers);
-            ZBus = new(ALU.ZRegister, Registers);
-            YBus = new(ALU.YRegister, Registers);
             YMDRBus = new(ALU.YRegister, MMU.MDR);
             IRAMBus = new(ALU.ZRegister, [MMU.MAR, MMU.MDR]);
             ORAMBus = new(ALU.ZRegister, [MMU.MAR, MMU.MDR]);
@@ -204,23 +223,23 @@
 
                     int width = (int)(code >> RAM_BUS_WIDTH_SHIFT & RAM_BUS_WIDTH_MASK);
 
-                    ALU.YRegister.SetValue(microcode.Intermediate);
+                    ALU.YRegister.SetValue(microcode.Immediate);
 
                     FlagsCCBus.UpdateState(cc);
                     ALU.Mode = (ALUMode)aluMode;
                     ALU.Function = (ALUFunction)alufc;
-                    XBus.UpdateState(xbus, RegisterHelper.RegisterCount);
-                    ZBus.UpdateState(zbus, RegisterHelper.RegisterCount);
+                    var xRegisterSrc = Multiplexer.Select(xbus);
+                    var yRegisterSrc = Multiplexer.Select(ybus);
+                    var zRegisterDst = Multiplexer.Select(zbus);
                     IRAMBus.UpdateState(ioram, 2);
                     ORAMBus.UpdateState(ioram + 2, 2);
-                    YBus.UpdateState(ybus, RegisterHelper.RegisterCount);
                     YMDRBus.UpdateState(*(ioram + 4));
                     MDRMCOPBus.UpdateState(ioram + 5, 1);
                     MMU.Mode = (RAMMode)mode;
                     MMU.BusWidth = (RAMBusWidth)width;
 
-                    XBus.Push();
-                    YBus.Push();
+                    ALU.XRegister.CopyFrom(xRegisterSrc.Value);
+                    ALU.YRegister.CopyFrom(yRegisterSrc.Value);
                     YMDRBus.Push();
                     ORAMBus.Push();
 
@@ -229,7 +248,7 @@
                     FlagsCCBus.Push();
 
                     // Store
-                    ZBus.Push();
+                    zRegisterDst.CopyFrom(ALU.ZRegister.Value);
                     IRAMBus.Push();
                     MDRMCOPBus.Push();
                     MMU.Update();

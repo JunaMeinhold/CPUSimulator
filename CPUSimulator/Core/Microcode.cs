@@ -3,42 +3,42 @@
     public unsafe struct Microcode
     {
         public ulong Code;
-        public ulong Intermediate;
+        public ulong Immediate;
 
         public Microcode(ulong code)
         {
             Code = code;
-            Intermediate = 0;
+            Immediate = 0;
         }
 
         public Microcode(ulong code, byte value)
         {
             Code = code;
-            Intermediate = value;
+            Immediate = value;
         }
 
         public Microcode(ulong code, short value)
         {
             Code = code;
-            Intermediate = *(ushort*)&value;
+            Immediate = *(ushort*)&value;
         }
 
         public Microcode(ulong code, int value)
         {
             Code = code;
-            Intermediate = *(uint*)&value;
+            Immediate = *(uint*)&value;
         }
 
         public Microcode(ulong code, long value)
         {
             Code = code;
-            Intermediate = *(ulong*)&value;
+            Immediate = *(ulong*)&value;
         }
 
         public Microcode(ulong code, ulong value)
         {
             Code = code;
-            Intermediate = value;
+            Immediate = value;
         }
 
         public ControlUnitFlag MC
